@@ -1,18 +1,22 @@
 import ProductCard from "../component/ProductCard";
-const products = [
-  { name: "Used Laptop", price: 25000 },
-  { name: "Engineering Books", price: 500 },
-  { name: "Calculator", price: 300 },
-];
+import { supabase } from "../lib/supabase";
 
-export default function Home() {
+export default async function Home() {
+  const { data: products, error } = await supabase
+    .from("products")
+    .select("*");
+
+  if (error) {
+    return <div>Error: {error.message}</div>;
+  }
+
   return (
     <main>
       <h1>College Marketplace</h1>
 
-      {products.map((product) => (
+      {products?.map((product) => (
         <ProductCard
-          key={product.name}
+          key={product.id}
           name={product.name}
           price={product.price}
         />
