@@ -3,16 +3,22 @@
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 
-export default function LoginPage() {
+export default function SignupPage() {
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
-  async function handleLogin(e: React.FormEvent) {
+  async function handleSignup(e: React.FormEvent) {
     e.preventDefault();
 
-    const { error } = await supabase.auth.signInWithPassword({
+    const { error } = await supabase.auth.signUp({
       email,
       password,
+      options: {
+        data: {
+          name,
+        },
+      },
     });
 
     if (error) {
@@ -20,14 +26,26 @@ export default function LoginPage() {
       return;
     }
 
-    alert("Login Successful!");
+    alert("Account created successfully!");
   }
 
   return (
     <main>
-      <h1>Login</h1>
+      <h1>Sign Up</h1>
 
-      <form onSubmit={handleLogin}>
+      <form onSubmit={handleSignup}>
+        <div>
+          <label>Name</label>
+          <br />
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+        </div>
+
+        <br />
+
         <div>
           <label>Email</label>
           <br />
@@ -52,7 +70,7 @@ export default function LoginPage() {
 
         <br />
 
-        <button type="submit">Login</button>
+        <button type="submit">Create Account</button>
       </form>
     </main>
   );
