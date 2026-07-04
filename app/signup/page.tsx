@@ -1,9 +1,18 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { toast } from "sonner";
+
+import Button from "@/component/ui/Button";
+import Input from "@/component/ui/Input";
+import Card from "@/component/ui/Card";
 
 export default function SignupPage() {
+  const router = useRouter();
+
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -22,56 +31,83 @@ export default function SignupPage() {
     });
 
     if (error) {
-      alert(error.message);
+      toast.error(error.message);
       return;
     }
 
-    alert("Account created successfully!");
+    toast.success("Account created successfully!");
+    router.push("/login");
   }
 
   return (
-    <main>
-      <h1>Sign Up</h1>
+    <main className="min-h-screen flex items-center justify-center bg-black px-4 py-10">
+      <Card className="w-full max-w-md p-8">
+        <h1 className="text-3xl font-bold text-center text-white">
+          Create Account
+        </h1>
 
-      <form onSubmit={handleSignup}>
-        <div>
-          <label>Name</label>
-          <br />
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
-        </div>
+        <p className="text-center text-gray-400 mt-2 mb-8">
+          Join the College Marketplace
+        </p>
 
-        <br />
+        <form onSubmit={handleSignup} className="space-y-5">
+          <div>
+            <label className="block text-white mb-2">
+              Full Name
+            </label>
 
-        <div>
-          <label>Email</label>
-          <br />
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
-        </div>
+            <Input
+              type="text"
+              placeholder="Enter your full name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+          </div>
 
-        <br />
+          <div>
+            <label className="block text-white mb-2">
+              Email
+            </label>
 
-        <div>
-          <label>Password</label>
-          <br />
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-        </div>
+            <Input
+              type="email"
+              placeholder="Enter your email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+          </div>
 
-        <br />
+          <div>
+            <label className="block text-white mb-2">
+              Password
+            </label>
 
-        <button type="submit">Create Account</button>
-      </form>
+            <Input
+              type="password"
+              placeholder="Create a password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </div>
+
+          <Button
+            type="submit"
+            className="w-full"
+          >
+            Create Account
+          </Button>
+        </form>
+
+        <p className="text-center text-gray-400 mt-6">
+          Already have an account?{" "}
+          <Link
+            href="/login"
+            className="text-blue-500 hover:text-blue-400 font-semibold"
+          >
+            Login
+          </Link>
+        </p>
+      </Card>
     </main>
   );
 }
