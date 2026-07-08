@@ -21,7 +21,7 @@ export default function ChatWindow({
   bottomRef,
 }: Props) {
   return (
-    <div className="flex-1 overflow-y-auto bg-[rgb(17,27,33)] px-6 py-5 space-y-3">
+    <div className="flex-1 overflow-y-auto bg-zinc-950 px-8 py-6 space-y-3">
       {messages.length === 0 ? (
         <div className="flex h-full flex-col items-center justify-center text-center text-zinc-400">
           <div className="mb-4 text-6xl">💬</div>

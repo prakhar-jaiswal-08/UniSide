@@ -134,13 +134,25 @@ export default function ChatPanel({ conversationId }: Props) {
     );
   }
 
-return (
-  <div className="flex h-full w-full flex-col bg-red-500">
-    <div className="h-20 bg-green-500">HEADER</div>
+ return (
+  <div className="flex h-full w-full min-w-0 flex-1 flex-col">
+    <ChatHeader
+      otherUser={otherUser}
+      productName={productName}
+    />
 
-    <div className="flex-1 bg-blue-500">MESSAGES</div>
+    <ChatWindow
+      messages={messages}
+      currentUserId={userId}
+      otherUser={otherUser}
+      bottomRef={bottomRef}
+    />
 
-    <div className="h-20 bg-yellow-500">INPUT</div>
+    <MessageInput
+      text={text}
+      setText={setText}
+      onSend={sendMessage}
+    />
   </div>
 );
 }
