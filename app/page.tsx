@@ -35,6 +35,7 @@ export default async function Home() {
             name={product.name}
             price={product.price}
             image_url={product.image_url}
+            status={product.status}
           />
         ))}
       </div>

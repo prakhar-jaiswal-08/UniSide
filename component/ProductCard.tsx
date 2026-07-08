@@ -14,6 +14,7 @@ type ProductCardProps = {
   image_url: string | null;
   sellerName?: string;
   category?: string;
+   status?: string;
 };
 
 export default function ProductCard({
@@ -23,6 +24,7 @@ export default function ProductCard({
   image_url,
   sellerName,
   category,
+   status,
 }: ProductCardProps) {
   const [wishlisted, setWishlisted] = useState(false);
 
@@ -74,7 +76,11 @@ export default function ProductCard({
       setWishlisted(true);
     }
   }
-
+   const statusStyles = {
+  available: "bg-green-100 text-green-700",
+  reserved: "bg-yellow-100 text-yellow-700",
+  sold: "bg-red-100 text-red-700",
+};
   return (
     <div className="bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 p-5 border w-80">
       <div className="relative h-48 bg-gray-100 rounded-lg mb-4 overflow-hidden flex items-center justify-center">
@@ -110,9 +116,25 @@ export default function ProductCard({
           {name}
         </h2>
 
-        <span className="bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded-full">
-          {category}
-        </span>
+       <div className="flex items-center gap-2">
+
+  {category && (
+    <span className="bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded-full">
+      {category}
+    </span>
+  )}
+
+  <span
+    className={`text-xs px-2 py-1 rounded-full font-medium ${
+      statusStyles[
+        (status as keyof typeof statusStyles) || "available"
+      ]
+    }`}
+  >
+    {status?.toUpperCase() || "AVAILABLE"}
+  </span>
+
+</div>
       </div>
 
       <p className="text-2xl font-bold text-green-600 mt-2">

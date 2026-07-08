@@ -36,19 +36,20 @@ export default async function ProductPage({
     .eq("id", product.user_id)
     .single();
 
-  console.log("Product:", product);
-  console.log("Seller:", seller);
 
-  return (
+ return (
+  <>
+    
+
     <main className="max-w-6xl mx-auto px-8 py-10">
       <Link
         href="/"
-        className="text-blue-600 hover:underline mb-8 inline-block"
+        className="mb-8 inline-block text-blue-600 hover:underline"
       >
         ← Back to Products
       </Link>
 
-      <div className="grid md:grid-cols-2 gap-10 bg-white rounded-xl shadow-2xl p-8">
+      <div className="grid gap-10 rounded-xl bg-white p-8 shadow-2xl md:grid-cols-2">
 
         <div>
           {product.image_url ? (
@@ -57,10 +58,10 @@ export default async function ProductPage({
               alt={product.name}
               width={600}
               height={600}
-              className="rounded-xl w-full h-[450px] object-cover"
+              className="h-[450px] w-full rounded-xl object-cover"
             />
           ) : (
-            <div className="w-full h-[450px] bg-gray-200 rounded-xl flex items-center justify-center text-gray-700 text-xl font-semibold">
+            <div className="flex h-[450px] w-full items-center justify-center rounded-xl bg-gray-200 text-xl font-semibold text-gray-700">
               No Image
             </div>
           )}
@@ -71,8 +72,22 @@ export default async function ProductPage({
             {product.name}
           </h1>
 
-          <p className="text-3xl font-bold text-green-600 mt-4">
+          <p className="mt-4 text-3xl font-bold text-green-600">
             ₹{product.price}
+          </p>
+          
+
+          {/* Product Status */}
+          <p
+            className={`mt-4 inline-block rounded-full px-4 py-2 text-sm font-semibold ${
+              product.status === "available"
+                ? "bg-green-100 text-green-700"
+                : product.status === "reserved"
+                ? "bg-yellow-100 text-yellow-700"
+                : "bg-red-100 text-red-700"
+            }`}
+          >
+            {product.status.toUpperCase()}
           </p>
 
           <div className="mt-8">
@@ -80,12 +95,12 @@ export default async function ProductPage({
               Description
             </h2>
 
-            <p className="mt-3 text-gray-800 leading-7">
+            <p className="mt-3 leading-7 text-gray-800">
               {product.description || "No description available."}
             </p>
           </div>
 
-          <div className="mt-8 border-t border-gray-300 pt-6 space-y-3">
+          <div className="mt-8 space-y-3 border-t border-gray-300 pt-6">
             <h2 className="text-xl font-bold text-gray-900">
               Seller Information
             </h2>
@@ -106,12 +121,23 @@ export default async function ProductPage({
             </p>
           </div>
 
-          <MessageSellerButton
-  productId={product.id}
-  sellerId={product.user_id}
-/>
+          {product.status === "sold" ? (
+            <button
+              disabled
+              className="mt-8 w-full cursor-not-allowed rounded-lg bg-gray-400 py-3 text-lg font-semibold text-white"
+            >
+              Product Sold
+            </button>
+          ) : (
+            <MessageSellerButton
+              productId={product.id}
+              sellerId={product.user_id}
+            />
+          )}
         </div>
+
       </div>
     </main>
+  </>
   );
 }

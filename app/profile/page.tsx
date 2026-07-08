@@ -4,11 +4,13 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import DeleteButton from "@/component/DeleteButton";
 import { supabase } from "@/lib/supabase";
+import StatusButton from "@/component/StatusButton";
 
 type Product = {
   id: number;
   name: string;
   price: number;
+   status: string;
 };
 
 export default function ProfilePage() {
@@ -42,7 +44,7 @@ export default function ProfilePage() {
 
       const { data: myProducts } = await supabase
         .from("products")
-        .select("id,name,price")
+        .select("id,name,price,status")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false });
 
@@ -107,9 +109,20 @@ export default function ProfilePage() {
                   <p className="text-green-600 font-bold">
                     ₹{product.price}
                   </p>
+                  <p
+  className={`mt-2 inline-block rounded-full px-3 py-1 text-sm font-medium ${
+    product.status === "available"
+      ? "bg-green-100 text-green-700"
+      : product.status === "reserved"
+      ? "bg-yellow-100 text-yellow-700"
+      : "bg-red-100 text-red-700"
+  }`}
+>
+  {product.status.toUpperCase()}
+</p>
                 </div>
 
-               <div className="flex gap-3">
+              <div className="flex items-center gap-3">
   <Link
     href={`/products/${product.id}`}
     className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg"
@@ -123,6 +136,11 @@ export default function ProfilePage() {
   >
     Edit
   </Link>
+
+  <StatusButton
+    productId={product.id}
+    currentStatus={product.status}
+  />
 
   <DeleteButton productId={product.id} />
 </div>

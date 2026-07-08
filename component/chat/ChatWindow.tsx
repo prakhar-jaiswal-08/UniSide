@@ -21,7 +21,17 @@ export default function ChatWindow({
   bottomRef,
 }: Props) {
   return (
-    <div className="flex-1 overflow-y-auto bg-zinc-950 px-8 py-6 space-y-3">
+    <div
+  className="
+    flex-1
+    overflow-y-auto
+    px-8
+    py-6
+    space-y-4
+    bg-[#0b141a]
+    bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.03),transparent_35%),radial-gradient(circle_at_bottom_right,rgba(255,255,255,0.02),transparent_35%)]
+  "
+>
       {messages.length === 0 ? (
         <div className="flex h-full flex-col items-center justify-center text-center text-zinc-400">
           <div className="mb-4 text-6xl">💬</div>
