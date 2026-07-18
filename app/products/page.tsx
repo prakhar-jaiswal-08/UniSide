@@ -102,7 +102,7 @@ export default function ProductsPage() {
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6 mb-8">
         <div>
           <h1 className="text-4xl font-bold text-white">
-            Browse Products
+            Latest listings
           </h1>
 
           <p className="text-gray-400 mt-2">

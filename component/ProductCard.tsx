@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { Package, Heart } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 
@@ -14,7 +15,7 @@ type ProductCardProps = {
   image_url: string | null;
   sellerName?: string;
   category?: string;
-   status?: string;
+  status?: string;
 };
 
 export default function ProductCard({
@@ -24,8 +25,10 @@ export default function ProductCard({
   image_url,
   sellerName,
   category,
-   status,
+  status,
 }: ProductCardProps) {
+  const router = useRouter();
+
   const [wishlisted, setWishlisted] = useState(false);
 
   useEffect(() => {
@@ -76,17 +79,25 @@ export default function ProductCard({
       setWishlisted(true);
     }
   }
-   const statusStyles = {
-  available: "bg-green-100 text-green-700",
-  reserved: "bg-yellow-100 text-yellow-700",
-  sold: "bg-red-100 text-red-700",
-};
+
+  const statusStyles = {
+    available: "bg-green-100 text-green-700",
+    reserved: "bg-yellow-100 text-yellow-700",
+    sold: "bg-red-100 text-red-700",
+  };
+
   return (
-    <div className="bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 p-5 border w-80">
-      <div className="relative h-48 bg-gray-100 rounded-lg mb-4 overflow-hidden flex items-center justify-center">
+   <div
+  onClick={() => router.push(`/products/${id}`)}
+  className="flex h-full w-full cursor-pointer flex-col rounded-xl border bg-white p-5 shadow-md transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
+>
+      <div className="relative mb-4 flex h-48 items-center justify-center overflow-hidden rounded-lg bg-gray-100">
         <button
-          onClick={toggleWishlist}
-          className="absolute top-3 right-3 bg-white rounded-full p-2 shadow"
+          onClick={(e) => {
+            e.stopPropagation();
+            toggleWishlist();
+          }}
+          className="absolute right-3 top-3 rounded-full bg-white p-2 shadow"
         >
           <Heart
             size={22}
@@ -104,52 +115,58 @@ export default function ProductCard({
             alt={name}
             width={400}
             height={300}
-            className="w-full h-full object-cover"
+            className="h-full w-full object-cover"
           />
         ) : (
-          <Package size={60} className="text-gray-400" />
+          <Package
+            size={60}
+            className="text-gray-400"
+          />
         )}
       </div>
 
-      <div className="flex justify-between items-center">
+      <div className="flex items-center justify-between">
         <h2 className="text-xl font-semibold text-gray-900">
           {name}
         </h2>
 
-       <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2">
+          {category && (
+            <span className="rounded-full bg-blue-100 px-2 py-1 text-xs text-blue-700">
+              {category}
+            </span>
+          )}
 
-  {category && (
-    <span className="bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded-full">
-      {category}
-    </span>
-  )}
-
-  <span
-    className={`text-xs px-2 py-1 rounded-full font-medium ${
-      statusStyles[
-        (status as keyof typeof statusStyles) || "available"
-      ]
-    }`}
-  >
-    {status?.toUpperCase() || "AVAILABLE"}
-  </span>
-
-</div>
+          <span
+            className={`rounded-full px-2 py-1 text-xs font-medium ${
+              statusStyles[
+                (status as keyof typeof statusStyles) || "available"
+              ]
+            }`}
+          >
+            {status?.toUpperCase() || "AVAILABLE"}
+          </span>
+        </div>
       </div>
 
-      <p className="text-2xl font-bold text-green-600 mt-2">
+      <p className="mt-2 text-2xl font-bold text-green-600">
         ₹{price}
       </p>
 
-      <p className="text-sm text-gray-500 mt-2">
+      <p className="mt-2 text-sm text-gray-500">
         Seller: {sellerName}
       </p>
 
-      <Link href={`/products/${id}`}>
-        <button className="w-full mt-5 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg">
-          View Details
-        </button>
-      </Link>
+      <div className="mt-auto pt-5">
+  <Link
+    href={`/products/${id}`}
+    onClick={(e) => e.stopPropagation()}
+  >
+    <button className="w-full rounded-lg bg-blue-600 py-2 text-white transition hover:bg-blue-700">
+      View Details
+    </button>
+  </Link>
+</div>
     </div>
   );
 }

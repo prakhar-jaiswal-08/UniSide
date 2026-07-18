@@ -27,7 +27,8 @@ export default function ChatPanel({ conversationId }: Props) {
   const [loading, setLoading] = useState(true);
 
   const [otherUser, setOtherUser] = useState("Loading...");
-  const [productName, setProductName] = useState("");
+const [otherUserId, setOtherUserId] = useState("");
+const [productName, setProductName] = useState("");
 
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -81,6 +82,7 @@ export default function ChatPanel({ conversationId }: Props) {
         conversation.buyer_id === user.id
           ? conversation.seller_id
           : conversation.buyer_id;
+          setOtherUserId(otherUserId);
 
       const { data: profile } = await supabase
         .from("profiles")
@@ -137,9 +139,10 @@ export default function ChatPanel({ conversationId }: Props) {
  return (
   <div className="flex h-full w-full min-w-0 flex-1 flex-col">
     <ChatHeader
-      otherUser={otherUser}
-      productName={productName}
-    />
+  otherUser={otherUser}
+  otherUserId={otherUserId}
+  productName={productName}
+/>
 
     <ChatWindow
       messages={messages}

@@ -5,11 +5,13 @@ import { MoreVertical, ArrowLeft } from "lucide-react";
 
 type Props = {
   otherUser: string;
+  otherUserId: string;
   productName: string;
 };
 
 export default function ChatHeader({
   otherUser,
+  otherUserId,
   productName,
 }: Props) {
   return (
@@ -19,28 +21,29 @@ export default function ChatHeader({
 
         <Link
           href="/chat"
-          className="rounded-full p-2 text-gray-400 transition hover:bg-[#2a3942] hover:text-white md:hidden"
+          className="rounded-full p-2 text-gray-400 transition hover:bg-[#2a3942] hover:text-white"
         >
           <ArrowLeft size={20} />
         </Link>
 
-        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-600 text-lg font-bold uppercase text-white">
-          {otherUser.charAt(0)}
-        </div>
+        <Link
+  href={`/profile/${otherUserId}`}
+  className="flex items-center gap-4 rounded-lg p-1 transition hover:bg-[#2a3942]"
+>
+  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-600 text-lg font-bold uppercase text-white">
+    {otherUser.charAt(0)}
+  </div>
 
-        <div>
-          <h2 className="text-lg font-semibold text-white">
-            {otherUser}
-          </h2>
+  <div>
+    <h2 className="text-lg font-semibold text-white">
+      {otherUser}
+    </h2>
 
-          <p className="text-sm text-blue-400">
-            {productName}
-          </p>
-
-          <p className="text-xs text-green-400">
-            ● Active now
-          </p>
-        </div>
+    <p className="text-sm text-blue-400">
+      {productName}
+    </p>
+  </div>
+</Link>
 
       </div>
 

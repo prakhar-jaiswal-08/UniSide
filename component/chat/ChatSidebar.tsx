@@ -17,6 +17,7 @@ type ChatItem = {
   conversation: Conversation;
   otherUserName: string;
   productName: string;
+  lastMessage: string;
 };
 
 function formatDate(date: string) {
@@ -34,6 +35,7 @@ function formatDate(date: string) {
 
 export default function ChatSidebar() {
   const [chats, setChats] = useState<ChatItem[]>([]);
+const [search, setSearch] = useState("");
   const pathname = usePathname();
 
   const selectedId =
@@ -64,27 +66,47 @@ export default function ChatSidebar() {
           ? conversation.seller_id
           : conversation.buyer_id;
 
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("name")
-        .eq("id", otherUserId)
-        .single();
+      const { data: profile, error: profileError } = await supabase
+  .from("profiles")
+  .select("id, name")
+  .eq("id", otherUserId)
+  .maybeSingle();
+
+console.log("Other User ID:", otherUserId);
+console.log("Profile:", profile);
+console.log("Profile Error:", profileError);
 
       const { data: product } = await supabase
         .from("products")
         .select("name")
         .eq("id", conversation.product_id)
         .single();
+        const { data: lastMessage } = await supabase
+  .from("messages")
+  .select("message")
+  .eq("conversation_id", conversation.id)
+  .order("created_at", { ascending: false })
+  .limit(1)
+  .maybeSingle();
 
       result.push({
-        conversation,
-        otherUserName: profile?.name ?? "Unknown User",
-        productName: product?.name ?? "Unknown Product",
-      });
+  conversation,
+  otherUserName: profile?.name ?? "Unknown User",
+  productName: product?.name ?? "Unknown Product",
+  lastMessage: lastMessage?.message ?? "No messages yet",
+});
     }
 
     setChats(result);
   }
+  const filteredChats = chats.filter((chat) => {
+  const query = search.toLowerCase();
+
+  return (
+    chat.otherUserName.toLowerCase().includes(query) ||
+    chat.productName.toLowerCase().includes(query)
+  );
+});
 
   return (
     <aside className="flex h-full w-full flex-col bg-[#202c33]">
@@ -97,22 +119,25 @@ export default function ChatSidebar() {
         </h1>
 
         <input
-          placeholder="Search conversations..."
-          className="mt-4 w-full rounded-lg border border-[#2a3942] bg-[#111b21] px-4 py-3 text-sm text-white outline-none placeholder:text-gray-500 focus:border-blue-500"
-        />
+  type="text"
+  placeholder="Search conversations..."
+  value={search}
+  onChange={(e) => setSearch(e.target.value)}
+  className="mt-4 w-full rounded-lg border border-[#2a3942] bg-[#111b21] px-4 py-3 text-sm text-white outline-none placeholder:text-gray-500 focus:border-blue-500"
+/>
 
       </div>
 
       {/* Chat List */}
       <div className="flex-1 overflow-y-auto">
 
-        {chats.length === 0 && (
+       {filteredChats.length === 0 && (
           <div className="flex h-full items-center justify-center text-sm text-gray-500">
             No conversations
           </div>
         )}
 
-        {chats.map((chat) => {
+        {filteredChats.map((chat) =>  {
           const active = selectedId === chat.conversation.id;
 
           return (
@@ -149,9 +174,9 @@ export default function ChatSidebar() {
                     {chat.productName}
                   </p>
 
-                  <p className="truncate text-sm text-gray-500">
-                    Tap to continue chatting
-                  </p>
+                 <p className="truncate text-sm text-gray-500">
+                     {chat.lastMessage}
+                    </p>
 
                 </div>
               </div>

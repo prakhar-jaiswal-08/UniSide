@@ -4,11 +4,18 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { Search, ShoppingBag, User, Heart } from "lucide-react";
+import {
+  Search,
+  ShoppingBag,
+  User,
+  Heart,
+  ChevronDown,
+} from "lucide-react";
 
 export default function Navbar() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [search, setSearch] = useState("");
+  const [searchType, setSearchType] = useState("all");
 
   const router = useRouter();
 
@@ -39,6 +46,7 @@ export default function Navbar() {
 
   return (
     <nav className="flex items-center justify-between px-8 py-4 border-b border-zinc-800 bg-black">
+      {/* Logo */}
       <Link
         href="/"
         className="flex items-center gap-2 text-2xl font-bold text-white"
@@ -47,22 +55,62 @@ export default function Navbar() {
         College Marketplace
       </Link>
 
-      <div className="flex items-center gap-3 border border-zinc-700 rounded-lg px-3 py-2 w-96 bg-zinc-900">
-        <Search size={18} className="text-gray-400" />
+      {/* Search */}
+      <div className="flex items-center w-[500px] border border-zinc-700 rounded-lg overflow-hidden bg-zinc-900">
+        <div className="relative">
+          <select
+            value={searchType}
+            onChange={(e) => setSearchType(e.target.value)}
+            className="appearance-none bg-zinc-900 text-white h-full pl-4 pr-10 py-3 outline-none border-r border-zinc-700 cursor-pointer"
+          >
+            <option value="all">All</option>
+            <option value="products">Products</option>
+            <option value="services">Services</option>
+            <option value="roommates">Roommates</option>
+          </select>
 
-        <input
-          type="text"
-          placeholder="Search products..."
-          value={search}
-          onChange={(e) => {
-            const value = e.target.value;
-            setSearch(value);
-            router.push(`/products?search=${encodeURIComponent(value)}`);
-          }}
-          className="w-full outline-none bg-transparent text-white placeholder:text-gray-500"
-        />
+          <ChevronDown
+            size={16}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+          />
+        </div>
+
+        <div className="flex items-center flex-1 px-3">
+          <Search size={18} className="text-gray-400 mr-2" />
+
+          <input
+            type="text"
+            placeholder="Search products, services, roommates, and more..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key !== "Enter" || !search.trim()) return;
+
+              const query = encodeURIComponent(search.trim());
+
+              switch (searchType) {
+                case "products":
+                  router.push(`/products?search=${query}`);
+                  break;
+
+                case "services":
+                  router.push(`/services?search=${query}`);
+                  break;
+
+                case "roommates":
+                  router.push(`/roommates?search=${query}`);
+                  break;
+
+                default:
+                  router.push(`/search?q=${query}`);
+              }
+            }}
+            className="w-full bg-transparent outline-none text-white placeholder:text-gray-500"
+          />
+        </div>
       </div>
 
+      {/* Navigation */}
       <div className="flex items-center gap-6 text-white">
         <Link href="/products">Products</Link>
 
@@ -77,9 +125,8 @@ export default function Navbar() {
               <Heart size={20} />
               Wishlist
             </Link>
-            <Link href="/chat">
-  Chats
-</Link>
+
+            <Link href="/chat">Chats</Link>
 
             <Link href="/profile">
               <User />

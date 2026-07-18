@@ -1,5 +1,6 @@
 "use client";
 
+import { uploadImage } from "@/lib/uploadImage";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
@@ -42,24 +43,19 @@ export default function SellPage() {
 
     let imageUrl = "";
 
-    if (image) {
-      const fileName = `${Date.now()}-${image.name}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from("product-images")
-        .upload(fileName, image);
-
-      if (uploadError) {
-       toast.error(uploadError.message);
-        return;
-      }
-
-      const { data } = supabase.storage
-        .from("product-images")
-        .getPublicUrl(fileName);
-
-      imageUrl = data.publicUrl;
-    }
+if (image) {
+  try {
+    imageUrl = await uploadImage(image);
+  } catch (err) {
+    toast.error(
+      err instanceof Error
+        ? err.message
+        : "Image upload failed."
+    );
+    return;
+  }
+}
+    
 
     const { error } = await supabase.from("products").insert([
       {

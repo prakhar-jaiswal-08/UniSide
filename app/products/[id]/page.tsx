@@ -1,7 +1,8 @@
 import Image from "next/image";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
-import MessageSellerButton from "@/component/MessageSellerButton";
+import MessageButton from "@/component/MessageButton";
+import ProductMenu from "@/component/ProductMenu";
 
 type ProductPageProps = {
   params: Promise<{
@@ -67,14 +68,28 @@ export default async function ProductPage({
           )}
         </div>
 
-        <div>
-          <h1 className="text-4xl font-bold text-gray-900">
-            {product.name}
-          </h1>
+       <div>
 
-          <p className="mt-4 text-3xl font-bold text-green-600">
-            ₹{product.price}
-          </p>
+  <div className="flex items-start justify-between">
+
+    <div>
+
+      <h1 className="text-4xl font-bold text-gray-900">
+        {product.name}
+      </h1>
+
+      <p className="mt-4 text-3xl font-bold text-green-600">
+        ₹{product.price}
+      </p>
+
+    </div>
+
+    <ProductMenu
+      productId={product.id}
+      sellerId={product.user_id}
+    />
+
+  </div>
           
 
           {/* Product Status */}
@@ -129,10 +144,12 @@ export default async function ProductPage({
               Product Sold
             </button>
           ) : (
-            <MessageSellerButton
-              productId={product.id}
-              sellerId={product.user_id}
-            />
+            <MessageButton
+  listingId={product.id.toString()}
+  listingType="product"
+  sellerId={product.user_id}
+  buttonText="Message Seller"
+/>
           )}
         </div>
 
