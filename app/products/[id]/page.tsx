@@ -1,14 +1,113 @@
+import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
+import {
+  Calendar,
+  User,
+  Package,
+} from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import MessageButton from "@/component/MessageButton";
 import ProductMenu from "@/component/ProductMenu";
+import BackButton from "@/component/navigation/BackButton";
 
 type ProductPageProps = {
   params: Promise<{
     id: string;
   }>;
 };
+
+type Product = {
+  id: string;
+  name: string;
+  price: number;
+  description: string | null;
+  category: string;
+  image_url: string | null;
+  created_at: string;
+  user_id: string;
+  status: string;
+};
+
+export async function generateMetadata({
+  params,
+}: ProductPageProps): Promise<Metadata> {
+  const { id } = await params;
+
+  const { data: product } = await supabase
+    .from("products")
+    .select(
+      "name,description,category,price,image_url"
+    )
+    .eq("id", id)
+    .maybeSingle();
+
+  if (!product) {
+    return {
+      title: "Product Not Found",
+      description:
+        "This product is no longer available on Uniside.",
+      robots: {
+        index: false,
+        follow: false,
+      },
+    };
+  }
+
+  const description =
+    product.description?.trim()
+      ? product.description.trim().slice(0, 160)
+      : `Buy ${product.name} on Uniside, the college marketplace for students.`;
+
+  return {
+    title: product.name,
+    description,
+
+    openGraph: {
+      type: "website",
+      title: `${product.name} | Uniside`,
+      description,
+      url: `/products/${id}`,
+      ...(product.image_url
+        ? {
+            images: [
+              {
+                url: product.image_url,
+                width: 1200,
+                height: 800,
+                alt: product.name,
+              },
+            ],
+          }
+        : {}),
+    },
+
+    twitter: {
+      card: product.image_url
+        ? "summary_large_image"
+        : "summary",
+      title: `${product.name} | Uniside`,
+      description,
+      ...(product.image_url
+        ? {
+            images: [product.image_url],
+          }
+        : {}),
+    },
+
+    alternates: {
+      canonical: `/products/${id}`,
+    },
+
+    keywords: [
+      product.name,
+      product.category,
+      "college marketplace",
+      "student marketplace",
+      "Uniside",
+    ],
+  };
+}
 
 export default async function ProductPage({
   params,
@@ -23,138 +122,227 @@ export default async function ProductPage({
 
   if (error || !product) {
     return (
-      <main className="max-w-4xl mx-auto p-10">
-        <h1 className="text-3xl font-bold text-red-500">
-          Product not found
-        </h1>
+      <main className="min-h-screen bg-gray-100 px-6 py-10 font-sans">
+        <div className="mx-auto max-w-4xl">
+          <BackButton
+            fallback="/products"
+            label="Back to Products"
+          />
+
+          <div className="mt-6 rounded-xl border border-gray-200 bg-white p-10 text-center shadow-sm">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-gray-100 text-gray-500">
+              <Package size={22} />
+            </div>
+
+            <h1 className="mt-4 text-xl font-semibold text-gray-950">
+              Product not found
+            </h1>
+
+            <p className="mt-2 text-sm text-gray-500">
+              This product may no longer be available.
+            </p>
+          </div>
+        </div>
       </main>
     );
   }
 
   const { data: seller } = await supabase
-    .from("profiles")
-    .select("name, email")
+    .from("public_profiles")
+    .select("id, name")
     .eq("id", product.user_id)
     .single();
 
+  const statusLabel =
+    product.status === "available"
+      ? "Available"
+      : product.status === "reserved"
+        ? "Reserved"
+        : "Sold";
 
- return (
-  <>
-    
+  const statusClasses =
+    product.status === "available"
+      ? "bg-green-50 text-green-700 border-green-200"
+      : product.status === "reserved"
+        ? "bg-yellow-50 text-yellow-700 border-yellow-200"
+        : "bg-red-50 text-red-700 border-red-200";
 
-    <main className="max-w-6xl mx-auto px-8 py-10">
-      <Link
-        href="/"
-        className="mb-8 inline-block text-blue-600 hover:underline"
-      >
-        ← Back to Products
-      </Link>
+  return (
+    <main className="min-h-screen bg-gray-100 px-5 py-8 font-sans text-gray-900 sm:px-6 lg:px-8 lg:py-10">
+      <div className="mx-auto max-w-6xl">
 
-      <div className="grid gap-10 rounded-xl bg-white p-8 shadow-2xl md:grid-cols-2">
+        {/* Back */}
+        <BackButton
+          fallback="/products"
+          label="Back to Products"
+        />
 
-        <div>
-          {product.image_url ? (
-            <Image
-              src={product.image_url}
-              alt={product.name}
-              width={600}
-              height={600}
-              className="h-[450px] w-full rounded-xl object-cover"
-            />
-          ) : (
-            <div className="flex h-[450px] w-full items-center justify-center rounded-xl bg-gray-200 text-xl font-semibold text-gray-700">
-              No Image
+        {/* Product */}
+        <div className="mt-6 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+          <div className="grid md:grid-cols-2">
+
+            {/* Image */}
+            <div className="border-b border-gray-200 bg-gray-50 md:border-b-0 md:border-r">
+              {product.image_url ? (
+                <div className="relative h-[360px] w-full sm:h-[450px] md:h-full md:min-h-[560px]">
+                  <Image
+                    src={product.image_url}
+                    alt={product.name}
+                    fill
+                    priority
+                    sizes="(max-width: 768px) 100vw, 50vw"
+                    className="object-cover"
+                  />
+                </div>
+              ) : (
+                <div className="flex h-[360px] w-full items-center justify-center bg-gray-100 text-gray-400 sm:h-[450px] md:h-full md:min-h-[560px]">
+                  <div className="text-center">
+                    <Package
+                      size={42}
+                      className="mx-auto text-gray-300"
+                    />
+
+                    <p className="mt-3 text-sm font-medium">
+                      No image available
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
-          )}
-        </div>
 
-       <div>
+            {/* Details */}
+            <div className="p-6 sm:p-8 lg:p-10">
 
-  <div className="flex items-start justify-between">
+              {/* Title + Menu */}
+              <div className="flex items-start justify-between gap-5">
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-400">
+                    Product
+                  </p>
 
-    <div>
+                  <h1 className="mt-2 text-3xl font-bold tracking-tight text-gray-950 sm:text-4xl">
+                    {product.name}
+                  </h1>
 
-      <h1 className="text-4xl font-bold text-gray-900">
-        {product.name}
-      </h1>
+                  <p className="mt-4 text-3xl font-bold text-gray-950">
+                    ₹{product.price}
+                  </p>
+                </div>
 
-      <p className="mt-4 text-3xl font-bold text-green-600">
-        ₹{product.price}
-      </p>
+                <ProductMenu
+                  productId={product.id}
+                  sellerId={product.user_id}
+                />
+              </div>
 
-    </div>
+              {/* Status */}
+              <div className="mt-5">
+                <span
+                  className={`inline-flex rounded-full border px-3 py-1.5 text-xs font-semibold ${statusClasses}`}
+                >
+                  {statusLabel}
+                </span>
+              </div>
 
-    <ProductMenu
-      productId={product.id}
-      sellerId={product.user_id}
-    />
+              {/* Description */}
+              <section className="mt-8 border-t border-gray-200 pt-7">
+                <h2 className="text-base font-semibold text-gray-950">
+                  Description
+                </h2>
 
-  </div>
-          
+                <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-gray-600">
+                  {product.description ||
+                    "No description available."}
+                </p>
+              </section>
 
-          {/* Product Status */}
-          <p
-            className={`mt-4 inline-block rounded-full px-4 py-2 text-sm font-semibold ${
-              product.status === "available"
-                ? "bg-green-100 text-green-700"
-                : product.status === "reserved"
-                ? "bg-yellow-100 text-yellow-700"
-                : "bg-red-100 text-red-700"
-            }`}
-          >
-            {product.status.toUpperCase()}
-          </p>
+              {/* Seller */}
+              <section className="mt-8 border-t border-gray-200 pt-7">
+                <h2 className="text-base font-semibold text-gray-950">
+                  Seller Information
+                </h2>
 
-          <div className="mt-8">
-            <h2 className="text-xl font-bold text-gray-900">
-              Description
-            </h2>
+                <div className="mt-4 space-y-3">
 
-            <p className="mt-3 leading-7 text-gray-800">
-              {product.description || "No description available."}
-            </p>
+                  {/* Seller */}
+                  <div className="flex items-center gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3.5">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gray-900 text-sm font-semibold uppercase text-white">
+                      {seller?.name?.charAt(0) ?? "?"}
+                    </div>
+
+                    <div className="min-w-0">
+                      <p className="text-xs text-gray-400">
+                        Seller
+                      </p>
+
+                      {seller ? (
+                        <Link
+                          href={`/profile/user/${product.user_id}`}
+                          className="mt-0.5 block truncate text-sm font-semibold text-gray-950 hover:underline"
+                        >
+                          {seller.name}
+                        </Link>
+                      ) : (
+                        <p className="mt-0.5 text-sm font-medium text-gray-600">
+                          Unknown seller
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Posted */}
+                  <div className="flex items-center gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3.5">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-gray-500 shadow-sm">
+                      <Calendar size={17} />
+                    </div>
+
+                    <div>
+                      <p className="text-xs text-gray-400">
+                        Posted
+                      </p>
+
+                      <p className="mt-0.5 text-sm font-medium text-gray-900">
+                        {new Date(
+                          product.created_at
+                        ).toLocaleDateString([], {
+                          day: "numeric",
+                          month: "long",
+                          year: "numeric",
+                        })}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              {/* Action */}
+              <div className="mt-8 border-t border-gray-200 pt-7">
+                {product.status === "sold" ? (
+                  <button
+                    disabled
+                    className="flex h-11 w-full cursor-not-allowed items-center justify-center rounded-lg bg-gray-200 text-sm font-medium text-gray-500"
+                  >
+                    Product Sold
+                  </button>
+                ) : (
+                  <MessageButton
+                    listingId={product.id.toString()}
+                    listingType="product"
+                    sellerId={product.user_id}
+                    buttonText="Message Seller"
+                  />
+                )}
+              </div>
+
+              {/* Privacy */}
+              <div className="mt-5 flex items-center gap-2 text-xs text-gray-400">
+                <User size={14} />
+                Seller contact information is kept private.
+              </div>
+            </div>
           </div>
-
-          <div className="mt-8 space-y-3 border-t border-gray-300 pt-6">
-            <h2 className="text-xl font-bold text-gray-900">
-              Seller Information
-            </h2>
-
-            <p className="text-gray-900">
-              <span className="font-semibold">Name:</span>{" "}
-              {seller?.name ?? "Unknown"}
-            </p>
-
-            <p className="text-gray-900">
-              <span className="font-semibold">Email:</span>{" "}
-              {seller?.email ?? "Not Available"}
-            </p>
-
-            <p className="text-gray-900">
-              <span className="font-semibold">Posted:</span>{" "}
-              {new Date(product.created_at).toLocaleDateString()}
-            </p>
-          </div>
-
-          {product.status === "sold" ? (
-            <button
-              disabled
-              className="mt-8 w-full cursor-not-allowed rounded-lg bg-gray-400 py-3 text-lg font-semibold text-white"
-            >
-              Product Sold
-            </button>
-          ) : (
-            <MessageButton
-  listingId={product.id.toString()}
-  listingType="product"
-  sellerId={product.user_id}
-  buttonText="Message Seller"
-/>
-          )}
         </div>
-
       </div>
     </main>
-  </>
   );
 }

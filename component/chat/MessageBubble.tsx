@@ -23,30 +23,32 @@ export default function MessageBubble({
       }`}
     >
       {!isMine && (
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-zinc-700 font-semibold uppercase text-white">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gray-200 text-sm font-semibold uppercase text-gray-700">
           {otherUser.charAt(0)}
         </div>
       )}
 
-      <div className="max-w-[65%]">
+      <div className="max-w-[75%] sm:max-w-[65%]">
         <div
-          className={`rounded-2xl px-4 py-3 shadow-md ${
+          className={`rounded-2xl px-4 py-2.5 ${
             isMine
-              ? "rounded-br-md bg-blue-600 text-white"
-              : "rounded-bl-md bg-[#202c33] text-white"
+              ? "rounded-br-md bg-gray-900 text-white"
+              : "rounded-bl-md border border-gray-200 bg-white text-gray-900 shadow-sm"
           }`}
         >
-          <p className="whitespace-pre-wrap break-words text-[15px] leading-6">
+          <p className="whitespace-pre-wrap break-words text-sm leading-6">
             {message.message}
           </p>
         </div>
 
         <p
-          className={`mt-1 text-xs text-zinc-500 ${
+          className={`mt-1.5 px-1 text-[11px] text-gray-400 ${
             isMine ? "text-right" : "text-left"
           }`}
         >
-          {new Date(message.created_at).toLocaleTimeString([], {
+          {new Date(
+            message.created_at
+          ).toLocaleTimeString([], {
             hour: "2-digit",
             minute: "2-digit",
           })}

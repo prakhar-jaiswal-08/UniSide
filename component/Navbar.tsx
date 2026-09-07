@@ -1,21 +1,18 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Search, User } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import {
-  Search,
-  ShoppingBag,
-  User,
-  Heart,
-  ChevronDown,
-} from "lucide-react";
+import SidePanel from "./SidePanel";
 
 export default function Navbar() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [search, setSearch] = useState("");
-  const [searchType, setSearchType] = useState("all");
+  const [searching, setSearching] = useState(false);
+  const [sidePanelOpen, setSidePanelOpen] = useState(false);
 
   const router = useRouter();
 
@@ -32,126 +29,293 @@ export default function Navbar() {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setIsLoggedIn(!!session);
-    });
+    } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setIsLoggedIn(!!session);
+      }
+    );
 
     return () => subscription.unsubscribe();
   }, []);
 
   async function handleLogout() {
     await supabase.auth.signOut();
+    setIsLoggedIn(false);
     router.push("/");
   }
 
+  async function handleSearch(
+    e: React.KeyboardEvent<HTMLInputElement>
+  ) {
+    if (e.key !== "Enter") return;
+
+    const query = search.trim();
+
+    if (!query || searching) return;
+
+    setSearching(true);
+
+    try {
+      const { data: products, error: productError } =
+        await supabase
+          .from("products")
+          .select("id")
+          .or(
+            `name.ilike.%${query}%,description.ilike.%${query}%,category.ilike.%${query}%`
+          )
+          .limit(1);
+
+      const { data: services, error: serviceError } =
+        await supabase
+          .from("services")
+          .select("id")
+          .or(
+            `title.ilike.%${query}%,description.ilike.%${query}%,category.ilike.%${query}%`
+          )
+          .limit(1);
+
+      if (productError) {
+        console.error(
+          "Product search error:",
+          productError
+        );
+      }
+
+      if (serviceError) {
+        console.error(
+          "Service search error:",
+          serviceError
+        );
+      }
+
+      const hasProducts =
+        !productError && (products?.length ?? 0) > 0;
+
+      const hasServices =
+        !serviceError && (services?.length ?? 0) > 0;
+
+      if (hasProducts && !hasServices) {
+        router.push(
+          `/products?search=${encodeURIComponent(query)}`
+        );
+        return;
+      }
+
+      if (hasServices && !hasProducts) {
+        router.push(
+          `/services?search=${encodeURIComponent(query)}`
+        );
+        return;
+      }
+
+      router.push(
+        `/search?q=${encodeURIComponent(query)}`
+      );
+    } catch (error) {
+      console.error("Search failed:", error);
+
+      router.push(
+        `/search?q=${encodeURIComponent(query)}`
+      );
+    } finally {
+      setSearching(false);
+    }
+  }
+
   return (
-    <nav className="flex items-center justify-between px-8 py-4 border-b border-zinc-800 bg-black">
-      {/* Logo */}
-      <Link
-        href="/"
-        className="flex items-center gap-2 text-2xl font-bold text-white"
-      >
-        <ShoppingBag size={28} />
-        College Marketplace
-      </Link>
+    <>
+      <header className="sticky top-0 z-50 border-b border-gray-300 bg-gray-100">
+        <div className="mx-auto flex h-[86px] max-w-[1600px] items-center justify-between px-5 lg:px-8">
 
-      {/* Search */}
-      <div className="flex items-center w-[500px] border border-zinc-700 rounded-lg overflow-hidden bg-zinc-900">
-        <div className="relative">
-          <select
-            value={searchType}
-            onChange={(e) => setSearchType(e.target.value)}
-            className="appearance-none bg-zinc-900 text-white h-full pl-4 pr-10 py-3 outline-none border-r border-zinc-700 cursor-pointer"
-          >
-            <option value="all">All</option>
-            <option value="products">Products</option>
-            <option value="services">Services</option>
-            <option value="roommates">Roommates</option>
-          </select>
+          {/* Logo */}
+          <Link
+  href="/"
+  className="flex h-14 w-[190px] shrink-0 items-center overflow-hidden"
+>
+  <Image
+    src="/uniside-logo.png"
+    alt="Uniside"
+    width={190}
+    height={190}
+    priority
+    className="h-[190px] w-[190px] max-w-none object-cover object-center"
+  />
+</Link>
 
-          <ChevronDown
-            size={16}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
-          />
-        </div>
+          {/* Search */}
+          <div className="mx-6 hidden max-w-xl flex-1 lg:block">
+            <div className="flex h-11 items-center rounded-full border border-gray-300 bg-white px-4 transition focus-within:border-gray-500 focus-within:ring-2 focus-within:ring-gray-200">
+              <Search
+                size={18}
+                className="mr-3 shrink-0 text-gray-500"
+              />
 
-        <div className="flex items-center flex-1 px-3">
-          <Search size={18} className="text-gray-400 mr-2" />
+              <input
+                type="text"
+                placeholder="Search products, services, roommates..."
+                value={search}
+                onChange={(e) =>
+                  setSearch(e.target.value)
+                }
+                onKeyDown={handleSearch}
+                disabled={searching}
+                className="w-full bg-transparent text-sm text-gray-900 outline-none placeholder:text-gray-500"
+              />
 
-          <input
-            type="text"
-            placeholder="Search products, services, roommates, and more..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key !== "Enter" || !search.trim()) return;
+              {searching && (
+                <span className="ml-2 shrink-0 text-xs text-gray-400">
+                  Searching...
+                </span>
+              )}
+            </div>
+          </div>
 
-              const query = encodeURIComponent(search.trim());
+          {/* Floating Navigation */}
+          <nav className="hidden rounded-full border border-gray-800 bg-gray-950 p-1.5 shadow-sm xl:flex">
 
-              switch (searchType) {
-                case "products":
-                  router.push(`/products?search=${query}`);
-                  break;
+            <FloatingNavLink href="/">
+              Home
+            </FloatingNavLink>
 
-                case "services":
-                  router.push(`/services?search=${query}`);
-                  break;
+            <FloatingNavLink href="/products">
+              Products
+            </FloatingNavLink>
 
-                case "roommates":
-                  router.push(`/roommates?search=${query}`);
-                  break;
+            <FloatingNavLink href="/services">
+              Services
+            </FloatingNavLink>
 
-                default:
-                  router.push(`/search?q=${query}`);
-              }
-            }}
-            className="w-full bg-transparent outline-none text-white placeholder:text-gray-500"
-          />
-        </div>
-      </div>
+            <FloatingNavLink href="/feed">
+              Feed
+            </FloatingNavLink>
 
-      {/* Navigation */}
-      <div className="flex items-center gap-6 text-white">
-        <Link href="/products">Products</Link>
+            <FloatingNavLink href="/roommates">
+              Roommates
+            </FloatingNavLink>
 
-        <Link href="/sell">Sell</Link>
+            <FloatingNavLink href="/sell">
+              Sell
+            </FloatingNavLink>
 
-        {isLoggedIn ? (
-          <>
-            <Link
-              href="/wishlist"
-              className="flex items-center gap-2 hover:text-red-400 transition"
-            >
-              <Heart size={20} />
-              Wishlist
-            </Link>
+            {isLoggedIn ? (
+              <button
+                type="button"
+                onClick={() => setSidePanelOpen(true)}
+                aria-label="Open account menu"
+                className="ml-1 flex h-10 w-10 items-center justify-center rounded-full bg-white text-gray-950 transition hover:bg-gray-200"
+              >
+                <User size={18} />
+              </button>
+            ) : (
+              <Link
+                href="/login"
+                className="ml-1 flex h-10 items-center rounded-full bg-white px-4 text-sm font-medium text-gray-950 transition hover:bg-gray-200"
+              >
+                Login
+              </Link>
+            )}
+          </nav>
 
-            <Link href="/chat">Chats</Link>
-
-            <Link href="/profile">
-              <User />
-            </Link>
-
+          {/* Mobile */}
+          <div className="flex items-center gap-2 xl:hidden">
             <button
-              onClick={handleLogout}
-              className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg"
+              type="button"
+              aria-label="Search"
+              className="flex h-10 w-10 items-center justify-center rounded-full border border-gray-300 bg-white text-gray-700"
             >
-              Logout
+              <Search size={19} />
             </button>
-          </>
-        ) : (
-          <>
-            <Link href="/login">Login</Link>
 
-            <Link
-              href="/signup"
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg"
-            >
-              Sign Up
-            </Link>
-          </>
-        )}
-      </div>
-    </nav>
+            {isLoggedIn ? (
+              <button
+                type="button"
+                onClick={() => setSidePanelOpen(true)}
+                aria-label="Open account menu"
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-gray-300 bg-white text-gray-700"
+              >
+                <User size={19} />
+              </button>
+            ) : (
+              <Link
+                href="/login"
+                className="rounded-full bg-gray-950 px-4 py-2 text-sm font-medium text-white"
+              >
+                Login
+              </Link>
+            )}
+          </div>
+        </div>
+
+        {/* Mobile Navigation */}
+        <div className="flex gap-1 overflow-x-auto border-t border-gray-200 px-4 py-2 xl:hidden">
+
+          <MobileNavLink href="/">
+            Home
+          </MobileNavLink>
+
+          <MobileNavLink href="/products">
+            Products
+          </MobileNavLink>
+
+          <MobileNavLink href="/services">
+            Services
+          </MobileNavLink>
+
+          <MobileNavLink href="/feed">
+            Feed
+          </MobileNavLink>
+
+          <MobileNavLink href="/roommates">
+            Roommates
+          </MobileNavLink>
+
+          <MobileNavLink href="/sell">
+            Sell
+          </MobileNavLink>
+        </div>
+      </header>
+
+      {isLoggedIn && (
+        <SidePanel
+          open={sidePanelOpen}
+          onClose={() => setSidePanelOpen(false)}
+          onLogout={handleLogout}
+        />
+      )}
+    </>
+  );
+}
+
+function FloatingNavLink({
+  href,
+  children,
+}: {
+  href: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Link
+      href={href}
+      className="rounded-full px-4 py-2.5 text-sm font-medium text-gray-300 transition hover:bg-gray-800 hover:text-white"
+    >
+      {children}
+    </Link>
+  );
+}
+
+function MobileNavLink({
+  href,
+  children,
+}: {
+  href: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Link
+      href={href}
+      className="shrink-0 rounded-full px-4 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-200 hover:text-gray-950"
+    >
+      {children}
+    </Link>
   );
 }

@@ -7,14 +7,17 @@ import { toast } from "sonner";
 type Props = {
   sellerId: string;
 
-  // Generic listing support
   listingId?: string;
-  listingType?: "product" | "service" | "roommate" | "lost_found";
+  listingType?:
+    | "product"
+    | "service"
+    | "roommate"
+    | "lost_found"
+    | "feed";
 
-  // Temporary backward compatibility
+  // Backward compatibility
   productId?: string;
 
-  // Custom button text
   buttonText?: string;
 };
 
@@ -46,33 +49,46 @@ export default function MessageButton({
       return;
     }
 
-    if (!finalListingId) {
-      toast.error("Listing not found.");
-      return;
-    }
+    /*
+     * A conversation is now based on the two users,
+     * not on the listing.
+     *
+     * This means:
+     * Product -> Chat
+     * Service -> Chat
+     * Roommate -> Chat
+     * Feed -> Chat
+     *
+     * will all open the same conversation between
+     * the same two students.
+     */
 
-    // Check if conversation already exists
-    const { data: existingConversation, error: findError } =
+    const { data: existingConversations, error: findError } =
       await supabase
         .from("conversations")
-        .select("id")
-        .eq("buyer_id", user.id)
-        .eq("seller_id", sellerId)
-        .eq("listing_type", finalListingType)
-        .eq("listing_id", Number(finalListingId))
-        .maybeSingle();
+        .select("id, buyer_id, seller_id")
+        .or(
+          `and(buyer_id.eq.${user.id},seller_id.eq.${sellerId}),and(buyer_id.eq.${sellerId},seller_id.eq.${user.id})`
+        )
+        .order("created_at", { ascending: true })
+        .limit(1);
 
     if (findError) {
       toast.error(findError.message);
       return;
     }
 
-    if (existingConversation) {
-      router.push(`/chat/${existingConversation.id}`);
+    if (existingConversations && existingConversations.length > 0) {
+      router.push(`/chat/${existingConversations[0].id}`);
       return;
     }
 
-    // Create new conversation
+    /*
+     * No conversation exists, so create the first one.
+     *
+     * We still keep the listing information for compatibility
+     * with existing conversations and chat context.
+     */
     const { data: newConversation, error: insertError } =
       await supabase
         .from("conversations")
@@ -81,11 +97,10 @@ export default function MessageButton({
           seller_id: sellerId,
 
           listing_type: finalListingType,
-          listing_id: Number(finalListingId),
+          listing_id: finalListingId ?? null,
 
-          // Keep old product chats working during migration
           product_id:
-            finalListingType === "product"
+            finalListingType === "product" && finalListingId
               ? Number(finalListingId)
               : null,
         })
