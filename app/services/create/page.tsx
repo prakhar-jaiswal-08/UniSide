@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { uploadImage } from "@/lib/uploadImage";
 import { toast } from "sonner";
-import { Wrench, Upload } from "lucide-react";
+import { Wrench, Upload, X } from "lucide-react";
 
 export default function CreateServicePage() {
   const router = useRouter();
@@ -17,7 +17,47 @@ export default function CreateServicePage() {
   const [status, setStatus] = useState("Available");
   const [pricingType, setPricingType] = useState("Fixed");
   const [location, setLocation] = useState("");
-  const [image, setImage] = useState<File | null>(null);
+
+  const [images, setImages] = useState<File[]>([]);
+  const [uploading, setUploading] = useState(false);
+
+  const handleImageChange = (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    if (!e.target.files) return;
+
+    const selectedFiles = Array.from(e.target.files);
+
+    setImages((current) => {
+      const combined = [...current, ...selectedFiles];
+
+      const unique = combined.filter(
+        (file, index, array) =>
+          index ===
+          array.findIndex(
+            (item) =>
+              item.name === file.name &&
+              item.size === file.size &&
+              item.lastModified === file.lastModified
+          )
+      );
+
+      if (unique.length > 5) {
+        toast.error("You can upload a maximum of 5 photos.");
+        return unique.slice(0, 5);
+      }
+
+      return unique;
+    });
+
+    e.target.value = "";
+  };
+
+  const removeImage = (indexToRemove: number) => {
+    setImages((current) =>
+      current.filter((_, index) => index !== indexToRemove)
+    );
+  };
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -47,43 +87,77 @@ export default function CreateServicePage() {
       return;
     }
 
-    let imageUrl = "";
-
-    if (image) {
-      try {
-        imageUrl = await uploadImage(image);
-      } catch (err) {
-        toast.error(
-          err instanceof Error
-            ? err.message
-            : "Image upload failed."
-        );
-        return;
-      }
-    }
-
-    const { error } = await supabase
-      .from("services")
-      .insert({
-        user_id: user.id,
-        title,
-        description,
-        category,
-        price: price ? Number(price) : null,
-        pricing_type: pricingType,
-        status,
-        location,
-        image_url: imageUrl,
-      });
-
-    if (error) {
-      toast.error(error.message);
+    if (images.length > 5) {
+      toast.error("You can upload a maximum of 5 photos.");
       return;
     }
 
-    toast.success("Service posted successfully!");
+    setUploading(true);
 
-    router.push("/services");
+    try {
+      const imageUrls: string[] = [];
+
+      for (const image of images) {
+        const url = await uploadImage(
+          image,
+          "service-images"
+        );
+
+        imageUrls.push(url);
+      }
+
+      const { data: service, error } = await supabase
+        .from("services")
+        .insert({
+          user_id: user.id,
+          title,
+          description,
+          category,
+          price: price ? Number(price) : null,
+          pricing_type: pricingType,
+          status,
+          location,
+          image_url: imageUrls[0] || "",
+        })
+        .select("id")
+        .single();
+
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
+
+      if (imageUrls.length > 1) {
+        const additionalImages = imageUrls
+          .slice(1)
+          .map((imageUrl, index) => ({
+            service_id: service.id,
+            image_url: imageUrl,
+            display_order: index + 1,
+          }));
+
+        const { error: imagesError } = await supabase
+          .from("service_images")
+          .insert(additionalImages);
+
+        if (imagesError) {
+          toast.error(imagesError.message);
+          return;
+        }
+      }
+
+      toast.success("Service posted successfully!");
+
+      router.push("/services");
+    } catch (err) {
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : "Something went wrong while uploading."
+      );
+    } finally {
+      setUploading(false);
+    }
   }
 
   return (
@@ -139,7 +213,7 @@ export default function CreateServicePage() {
               <select
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-gray-900 outline-none transition focus:border-gray-500 focus:ring-2 focus:ring-gray-200"
+                className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-gray-900 outline-none transition"
               >
                 <option value="">Select Category</option>
                 <option>Tutoring</option>
@@ -164,7 +238,9 @@ export default function CreateServicePage() {
 
               <textarea
                 value={description}
-                onChange={(e) => setDescription(e.target.value)}
+                onChange={(e) =>
+                  setDescription(e.target.value)
+                }
                 className="h-36 w-full resize-y rounded-lg border border-gray-300 bg-white px-4 py-3 text-gray-900 outline-none transition placeholder:text-gray-400 focus:border-gray-500 focus:ring-2 focus:ring-gray-200"
                 placeholder="Describe your service..."
               />
@@ -172,7 +248,6 @@ export default function CreateServicePage() {
 
             {/* Price + Pricing Type */}
             <div className="grid gap-6 md:grid-cols-2">
-
               <div>
                 <label className="mb-2 block text-sm font-semibold text-gray-900">
                   Price
@@ -198,7 +273,7 @@ export default function CreateServicePage() {
                   onChange={(e) =>
                     setPricingType(e.target.value)
                   }
-                  className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-gray-900 outline-none transition focus:border-gray-500 focus:ring-2 focus:ring-gray-200"
+                  className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-gray-900 outline-none transition"
                 >
                   <option value="Fixed">Fixed</option>
                   <option value="Per Hour">Per Hour</option>
@@ -206,7 +281,6 @@ export default function CreateServicePage() {
                   <option value="Free">Free</option>
                 </select>
               </div>
-
             </div>
 
             {/* Status */}
@@ -218,7 +292,7 @@ export default function CreateServicePage() {
               <select
                 value={status}
                 onChange={(e) => setStatus(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-gray-900 outline-none transition focus:border-gray-500 focus:ring-2 focus:ring-gray-200"
+                className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-gray-900 outline-none transition"
               >
                 <option value="Available">Available</option>
                 <option value="Reserved">Reserved</option>
@@ -240,53 +314,90 @@ export default function CreateServicePage() {
               />
             </div>
 
-            {/* Image */}
+            {/* Images */}
             <div>
               <label className="mb-2 block text-sm font-semibold text-gray-900">
-                Service Image
+                Service Images
               </label>
 
               <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-dashed border-gray-300 bg-gray-50 px-4 py-4 transition hover:bg-gray-100">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white text-gray-600 shadow-sm">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white text-gray-600 shadow-sm">
                   <Upload size={19} />
                 </div>
 
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-gray-900">
-                    {image ? image.name : "Choose an image"}
+                    {images.length > 0
+                      ? `${images.length} photo${
+                          images.length > 1 ? "s" : ""
+                        } selected`
+                      : "Choose service photos"}
                   </p>
 
                   <p className="mt-0.5 text-xs text-gray-500">
-                    JPG, PNG or other image formats
+                    JPG, PNG, HEIC or other image formats · Max 5 photos
                   </p>
                 </div>
 
                 <input
                   type="file"
-                  accept="image/*"
-                  onChange={(e) => {
-                    if (e.target.files?.length) {
-                      setImage(e.target.files[0]);
-                    }
-                  }}
+                  accept="image/*,.heic,.heif"
+                  multiple
+                  onChange={handleImageChange}
                   className="hidden"
                 />
               </label>
-            </div>
 
+              {/* Image Previews */}
+              {images.length > 0 && (
+                <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
+                  {images.map((image, index) => (
+                    <div
+                      key={`${image.name}-${image.size}-${image.lastModified}`}
+                      className="relative overflow-hidden rounded-lg border border-gray-200 bg-gray-50"
+                    >
+                      <div className="aspect-square">
+                        <img
+                          src={URL.createObjectURL(image)}
+                          alt={`Service photo ${index + 1}`}
+                          className="h-full w-full object-cover"
+                        />
+                      </div>
+
+                      {index === 0 && (
+                        <div className="absolute left-2 top-2 rounded-md bg-gray-900 px-2 py-1 text-[10px] font-semibold text-white">
+                          Main
+                        </div>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => removeImage(index)}
+                        aria-label={`Remove photo ${index + 1}`}
+                        className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-white/95 text-gray-800 shadow-md transition hover:bg-white"
+                      >
+                        <X size={15} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Submit */}
           <div className="mt-8 border-t border-gray-200 pt-6">
             <button
               type="submit"
-              className="w-full rounded-lg bg-gray-900 py-3 font-semibold text-white transition hover:bg-gray-800"
+              disabled={uploading}
+              className="w-full rounded-lg bg-gray-900 py-3 font-semibold text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Offer Service
+              {uploading
+                ? "Uploading..."
+                : "Offer Service"}
             </button>
           </div>
         </form>
-
       </div>
     </main>
   );

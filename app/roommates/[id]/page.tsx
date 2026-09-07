@@ -1,4 +1,3 @@
-import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
@@ -17,6 +16,7 @@ import MessageButton from "@/component/MessageButton";
 import ReportRoommateButton from "@/component/ReportRoommateButton";
 import RoommateOwnerActions from "@/component/RoommateOwnerActions";
 import WishlistButton from "@/component/WishlistButton";
+import ProductImageGallery from "@/component/ProductImageGallery";
 
 type Props = {
   params: Promise<{
@@ -59,6 +59,7 @@ export async function generateMetadata({
   return {
     title: `Roommate in ${roommate.college}`,
     description,
+
     openGraph: {
       type: "website",
       title: `Roommate in ${roommate.college} | Uniside`,
@@ -77,6 +78,7 @@ export async function generateMetadata({
           }
         : {}),
     },
+
     twitter: {
       card: roommate.image_url
         ? "summary_large_image"
@@ -87,9 +89,11 @@ export async function generateMetadata({
         ? { images: [roommate.image_url] }
         : {}),
     },
+
     alternates: {
       canonical: `/roommates/${id}`,
     },
+
     keywords: [
       roommate.name,
       roommate.college,
@@ -119,6 +123,22 @@ export default async function RoommateDetailsPage({
   if (error || !roommate) {
     notFound();
   }
+
+  /* Additional roommate images */
+  const { data: additionalImages } = await supabase
+    .from("roommate_images")
+    .select("image_url,display_order")
+    .eq("roommate_id", roommate.id)
+    .order("display_order", { ascending: true });
+
+  const roommateImages = [
+    ...(roommate.image_url
+      ? [roommate.image_url]
+      : []),
+    ...(additionalImages?.map(
+      (image) => image.image_url
+    ) ?? []),
+  ];
 
   const { data: profile } = await supabase
     .from("public_profiles")
@@ -155,18 +175,13 @@ export default async function RoommateDetailsPage({
         <div className="mt-6 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
           <div className="grid md:grid-cols-2">
 
+            {/* Image Gallery */}
             <div className="border-b border-gray-200 bg-gray-50 md:border-b-0 md:border-r">
-              {roommate.image_url ? (
-                <div className="relative h-[360px] w-full sm:h-[450px] md:h-full md:min-h-[600px]">
-                  <Image
-                    src={roommate.image_url}
-                    alt={roommate.name}
-                    fill
-                    priority
-                    sizes="(max-width: 768px) 100vw, 50vw"
-                    className="object-contain"
-                  />
-                </div>
+              {roommateImages.length > 0 ? (
+                <ProductImageGallery
+                  images={roommateImages}
+                  productName={roommate.name}
+                />
               ) : (
                 <div className="flex h-[360px] w-full items-center justify-center bg-gray-100 sm:h-[450px] md:h-full md:min-h-[600px]">
                   <div className="text-center">
@@ -183,6 +198,7 @@ export default async function RoommateDetailsPage({
               )}
             </div>
 
+            {/* Details */}
             <div className="p-6 sm:p-8 lg:p-10">
 
               <div className="flex items-start justify-between gap-4">
@@ -214,6 +230,7 @@ export default async function RoommateDetailsPage({
                 </div>
               </div>
 
+              {/* Accommodation Details */}
               <section className="mt-8 border-t border-gray-200 pt-7">
                 <h2 className="text-base font-semibold text-gray-950">
                   Accommodation Details
@@ -257,6 +274,7 @@ export default async function RoommateDetailsPage({
                 </div>
               </section>
 
+              {/* Gender Preference */}
               {roommate.gender_preference && (
                 <section className="mt-8 border-t border-gray-200 pt-7">
                   <h2 className="text-base font-semibold text-gray-950">
@@ -271,6 +289,7 @@ export default async function RoommateDetailsPage({
                 </section>
               )}
 
+              {/* Preferences */}
               {roommate.preferences && (
                 <section className="mt-8 border-t border-gray-200 pt-7">
                   <h2 className="text-base font-semibold text-gray-950">
@@ -285,6 +304,7 @@ export default async function RoommateDetailsPage({
                 </section>
               )}
 
+              {/* Description */}
               {roommate.description && (
                 <section className="mt-8 border-t border-gray-200 pt-7">
                   <h2 className="text-base font-semibold text-gray-950">
@@ -297,6 +317,7 @@ export default async function RoommateDetailsPage({
                 </section>
               )}
 
+              {/* Listed By */}
               <section className="mt-8 border-t border-gray-200 pt-7">
                 <h2 className="text-base font-semibold text-gray-950">
                   Listed By
@@ -324,6 +345,7 @@ export default async function RoommateDetailsPage({
                 </div>
               </section>
 
+              {/* Actions */}
               <div className="mt-8 border-t border-gray-200 pt-7">
 
                 {roommate.status === "available" ? (
@@ -354,6 +376,7 @@ export default async function RoommateDetailsPage({
                 </div>
               </div>
 
+              {/* Privacy */}
               <div className="mt-5 flex items-center gap-2 text-xs text-gray-400">
                 <User size={14} />
                 Contact information is kept private.

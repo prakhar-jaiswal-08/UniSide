@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase-server";
 import MessageButton from "@/component/MessageButton";
 import ReportServiceButton from "@/component/ReportServiceButton";
 import WishlistButton from "@/component/WishlistButton";
+import ProductImageGallery from "@/component/ProductImageGallery";
 import {
   Wrench,
   CheckCircle,
@@ -125,6 +125,20 @@ export default async function ServiceDetailsPage({
     notFound();
   }
 
+  /* Additional service images */
+  const { data: additionalImages } = await supabase
+    .from("service_images")
+    .select("image_url,display_order")
+    .eq("service_id", service.id)
+    .order("display_order", { ascending: true });
+
+  const serviceImages = [
+    ...(service.image_url ? [service.image_url] : []),
+    ...(additionalImages?.map(
+      (image) => image.image_url
+    ) ?? []),
+  ];
+
   const { data: provider } = await supabase
     .from("public_profiles")
     .select("id, name")
@@ -152,19 +166,13 @@ export default async function ServiceDetailsPage({
         <div className="mt-6 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
           <div className="grid md:grid-cols-2">
 
-            {/* Image */}
+            {/* Image Gallery */}
             <div className="border-b border-gray-200 bg-gray-50 md:border-b-0 md:border-r">
-              {service.image_url ? (
-                <div className="relative h-[360px] w-full sm:h-[450px] md:h-full md:min-h-[600px]">
-                  <Image
-                    src={service.image_url}
-                    alt={service.title}
-                    fill
-                    priority
-                    sizes="(max-width: 768px) 100vw, 50vw"
-                    className="object-cover"
-                  />
-                </div>
+              {serviceImages.length > 0 ? (
+                <ProductImageGallery
+                  images={serviceImages}
+                  productName={service.title}
+                />
               ) : (
                 <div className="flex h-[360px] w-full items-center justify-center bg-gray-100 sm:h-[450px] md:h-full md:min-h-[600px]">
                   <div className="text-center">

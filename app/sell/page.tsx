@@ -11,7 +11,8 @@ export default function SellPage() {
   const [price, setPrice] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("Others");
-  const [image, setImage] = useState<File | null>(null);
+  const [images, setImages] = useState<File[]>([]);
+  const [uploading, setUploading] = useState(false);
 
   const router = useRouter();
 
@@ -29,8 +30,51 @@ export default function SellPage() {
     checkUser();
   }, [router]);
 
+  const handleImageChange = (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    if (!e.target.files) return;
+
+    const selectedFiles = Array.from(e.target.files);
+
+    setImages((current) => {
+      const combined = [...current, ...selectedFiles];
+
+      const unique = combined.filter(
+        (file, index, array) =>
+          index ===
+          array.findIndex(
+            (item) =>
+              item.name === file.name &&
+              item.size === file.size &&
+              item.lastModified === file.lastModified
+          )
+      );
+
+      if (unique.length > 5) {
+        toast.error("You can upload a maximum of 5 photos.");
+        return unique.slice(0, 5);
+      }
+
+      return unique;
+    });
+
+    e.target.value = "";
+  };
+
+  const removeImage = (index: number) => {
+    setImages((current) =>
+      current.filter((_, i) => i !== index)
+    );
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (images.length === 0) {
+      toast.error("Please upload at least one photo.");
+      return;
+    }
 
     const {
       data: { user },
@@ -41,55 +85,78 @@ export default function SellPage() {
       return;
     }
 
-    let imageUrl = "";
+    setUploading(true);
 
-    if (image) {
-      try {
-        imageUrl = await uploadImage(image);
-      } catch (err) {
-        toast.error(
-          err instanceof Error
-            ? err.message
-            : "Image upload failed."
-        );
-        return;
+    try {
+      const imageUrls: string[] = [];
+
+      for (const image of images) {
+        const url = await uploadImage(image);
+        imageUrls.push(url);
       }
+
+      const { data: product, error } = await supabase
+        .from("products")
+        .insert([
+          {
+            name,
+            price: Number(price),
+            description,
+            category,
+            user_id: user.id,
+            image_url: imageUrls[0],
+          },
+        ])
+        .select("id")
+        .single();
+
+      if (error || !product) {
+        throw new Error(
+          error?.message || "Failed to create product."
+        );
+      }
+
+      if (imageUrls.length > 1) {
+        const additionalImages = imageUrls
+          .slice(1)
+          .map((url, index) => ({
+            product_id: product.id,
+            image_url: url,
+            display_order: index + 1,
+          }));
+
+        const { error: imagesError } = await supabase
+          .from("product_images")
+          .insert(additionalImages);
+
+        if (imagesError) {
+          throw new Error(imagesError.message);
+        }
+      }
+
+      toast.success("Product listed successfully!");
+
+      setName("");
+      setPrice("");
+      setDescription("");
+      setCategory("Others");
+      setImages([]);
+
+      router.push("/products");
+    } catch (err) {
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : "Failed to list product."
+      );
+    } finally {
+      setUploading(false);
     }
-
-    const { error } = await supabase
-      .from("products")
-      .insert([
-        {
-          name,
-          price: Number(price),
-          description,
-          category,
-          user_id: user.id,
-          image_url: imageUrl,
-        },
-      ]);
-
-    if (error) {
-      toast.error("Failed to list product.");
-      return;
-    }
-
-    toast.success("Product listed successfully!");
-
-    setName("");
-    setPrice("");
-    setDescription("");
-    setCategory("Others");
-    setImage(null);
-
-    router.push("/products");
   };
 
   return (
     <main className="min-h-screen bg-gray-100 px-6 py-10 font-sans text-gray-900 lg:px-8">
       <div className="mx-auto max-w-3xl">
-
-        {/* Header */}
 
         <div className="mb-7">
           <p className="text-sm font-semibold uppercase tracking-[0.16em] text-gray-500">
@@ -105,12 +172,8 @@ export default function SellPage() {
           </p>
         </div>
 
-        {/* Form Card */}
-
         <div className="rounded-xl border border-gray-300 bg-white p-6 shadow-md sm:p-8">
           <form onSubmit={handleSubmit} className="space-y-5">
-
-            {/* Product Name */}
 
             <div>
               <label
@@ -131,8 +194,6 @@ export default function SellPage() {
               />
             </div>
 
-            {/* Price */}
-
             <div>
               <label
                 htmlFor="price"
@@ -152,8 +213,6 @@ export default function SellPage() {
                 className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900 outline-none placeholder:text-gray-400 transition focus:border-gray-500 focus:ring-2 focus:ring-gray-200"
               />
             </div>
-
-            {/* Category */}
 
             <div>
               <label
@@ -178,8 +237,6 @@ export default function SellPage() {
               </select>
             </div>
 
-            {/* Description */}
-
             <div>
               <label
                 htmlFor="description"
@@ -193,56 +250,75 @@ export default function SellPage() {
                 rows={5}
                 placeholder="Describe your product..."
                 value={description}
-                onChange={(e) =>
-                  setDescription(e.target.value)
-                }
+                onChange={(e) => setDescription(e.target.value)}
                 required
                 className="w-full resize-y rounded-lg border border-gray-300 bg-white px-3 py-3 text-sm text-gray-900 outline-none placeholder:text-gray-400 transition focus:border-gray-500 focus:ring-2 focus:ring-gray-200"
               />
             </div>
-
-            {/* Product Image */}
 
             <div>
               <label
                 htmlFor="product-image"
                 className="mb-2 block text-sm font-semibold text-gray-900"
               >
-                Product Image
+                Product Images
               </label>
 
               <input
                 id="product-image"
                 type="file"
-                accept="image/*"
-                onChange={(e) => {
-                  if (
-                    e.target.files &&
-                    e.target.files.length > 0
-                  ) {
-                    setImage(e.target.files[0]);
-                  }
-                }}
+                accept="image/*,.heic,.heif"
+                multiple
+                onChange={handleImageChange}
                 className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-700 file:mr-4 file:rounded-md file:border-0 file:bg-gray-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-gray-700 hover:file:bg-gray-200"
               />
 
-              {image && (
-                <p className="mt-2 text-xs text-gray-500">
-                  Selected: {image.name}
-                </p>
+              <p className="mt-2 text-xs text-gray-500">
+                Select up to 5 photos. HEIC and HEIF images are supported.
+              </p>
+
+              {images.length > 0 && (
+                <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-5">
+                  {images.map((image, index) => (
+                    <div
+                      key={`${image.name}-${image.size}-${image.lastModified}`}
+                      className="relative overflow-hidden rounded-lg border border-gray-200 bg-gray-50"
+                    >
+                      <img
+                        src={URL.createObjectURL(image)}
+                        alt={`Selected product photo ${index + 1}`}
+                        className="h-24 w-full object-cover"
+                      />
+
+                      <button
+                        type="button"
+                        onClick={() => removeImage(index)}
+                        className="absolute right-1.5 top-1.5 rounded-md bg-gray-900 px-2 py-1 text-xs font-medium text-white transition hover:bg-gray-800"
+                      >
+                        Remove
+                      </button>
+
+                      {index === 0 && (
+                        <span className="absolute bottom-1.5 left-1.5 rounded-md bg-white px-2 py-1 text-[10px] font-semibold text-gray-700 shadow-sm">
+                          Main
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
-
-            {/* Submit */}
 
             <div className="pt-2">
               <button
                 type="submit"
-                className="w-full rounded-lg bg-gray-900 py-3 text-sm font-semibold text-white transition hover:bg-gray-800"
+                disabled={uploading}
+                className="w-full rounded-lg bg-gray-900 py-3 text-sm font-semibold text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                List Product
+                {uploading ? "Uploading..." : "List Product"}
               </button>
             </div>
+
           </form>
         </div>
       </div>

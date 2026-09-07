@@ -1,15 +1,14 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
 import {
   Calendar,
   User,
-  Package,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import MessageButton from "@/component/MessageButton";
 import ProductMenu from "@/component/ProductMenu";
 import BackButton from "@/component/navigation/BackButton";
+import ProductImageGallery from "@/component/ProductImageGallery";
 
 type ProductPageProps = {
   params: Promise<{
@@ -131,7 +130,7 @@ export default async function ProductPage({
 
           <div className="mt-6 rounded-xl border border-gray-200 bg-white p-10 text-center shadow-sm">
             <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-gray-100 text-gray-500">
-              <Package size={22} />
+              <span className="text-xl">?</span>
             </div>
 
             <h1 className="mt-4 text-xl font-semibold text-gray-950">
@@ -146,6 +145,19 @@ export default async function ProductPage({
       </main>
     );
   }
+
+  const { data: additionalImages } = await supabase
+    .from("product_images")
+    .select("image_url,display_order")
+    .eq("product_id", product.id)
+    .order("display_order", { ascending: true });
+
+  const productImages = [
+    ...(product.image_url ? [product.image_url] : []),
+    ...(additionalImages?.map(
+      (image) => image.image_url
+    ) ?? []),
+  ];
 
   const { data: seller } = await supabase
     .from("public_profiles")
@@ -181,33 +193,12 @@ export default async function ProductPage({
         <div className="mt-6 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
           <div className="grid md:grid-cols-2">
 
-            {/* Image */}
+            {/* Image Gallery */}
             <div className="border-b border-gray-200 bg-gray-50 md:border-b-0 md:border-r">
-              {product.image_url ? (
-                <div className="relative h-[360px] w-full sm:h-[450px] md:h-full md:min-h-[560px]">
-                  <Image
-                    src={product.image_url}
-                    alt={product.name}
-                    fill
-                    priority
-                    sizes="(max-width: 768px) 100vw, 50vw"
-                    className="object-cover"
-                  />
-                </div>
-              ) : (
-                <div className="flex h-[360px] w-full items-center justify-center bg-gray-100 text-gray-400 sm:h-[450px] md:h-full md:min-h-[560px]">
-                  <div className="text-center">
-                    <Package
-                      size={42}
-                      className="mx-auto text-gray-300"
-                    />
-
-                    <p className="mt-3 text-sm font-medium">
-                      No image available
-                    </p>
-                  </div>
-                </div>
-              )}
+              <ProductImageGallery
+                images={productImages}
+                productName={product.name}
+              />
             </div>
 
             {/* Details */}

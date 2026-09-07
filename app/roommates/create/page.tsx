@@ -3,8 +3,15 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Home, Users, Upload } from "lucide-react";
+import {
+  ArrowLeft,
+  Home,
+  Users,
+  Upload,
+  X,
+} from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { uploadImage } from "@/lib/uploadImage";
 
 export default function CreateRoommatePage() {
   const router = useRouter();
@@ -22,7 +29,7 @@ export default function CreateRoommatePage() {
     contact_preference: "",
   });
 
-  const [image, setImage] = useState<File | null>(null);
+  const [images, setImages] = useState<File[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -40,27 +47,71 @@ export default function CreateRoommatePage() {
   function handleImageChange(
     e: React.ChangeEvent<HTMLInputElement>
   ) {
-    const file = e.target.files?.[0] || null;
+    if (!e.target.files) return;
 
-    if (!file) {
-      setImage(null);
+    const selectedFiles = Array.from(e.target.files);
+
+    const validFiles = selectedFiles.filter((file) => {
+      const fileExtension =
+        file.name.split(".").pop()?.toLowerCase();
+
+      const isImage =
+        file.type.startsWith("image/") ||
+        fileExtension === "heic" ||
+        fileExtension === "heif";
+
+      if (!isImage) {
+        setError(
+          "Please select valid image files."
+        );
+        return false;
+      }
+
+      if (file.size > 5 * 1024 * 1024) {
+        setError(
+          `${file.name} is larger than 5 MB.`
+        );
+        return false;
+      }
+
+      return true;
+    });
+
+    if (validFiles.length === 0) {
+      e.target.value = "";
       return;
     }
 
-    if (!file.type.startsWith("image/")) {
-      setError("Please select a valid image file.");
-      setImage(null);
-      return;
-    }
+    setImages((current) => {
+      const combined = [...current, ...validFiles];
 
-    if (file.size > 5 * 1024 * 1024) {
-      setError("Image size must be less than 5 MB.");
-      setImage(null);
-      return;
-    }
+      const unique = combined.filter(
+        (file, index, array) =>
+          index ===
+          array.findIndex(
+            (item) =>
+              item.name === file.name &&
+              item.size === file.size &&
+              item.lastModified === file.lastModified
+          )
+      );
 
-    setError("");
-    setImage(file);
+      if (unique.length > 5) {
+        setError("You can upload a maximum of 5 photos.");
+        return unique.slice(0, 5);
+      }
+
+      setError("");
+      return unique;
+    });
+
+    e.target.value = "";
+  }
+
+  function removeImage(indexToRemove: number) {
+    setImages((current) =>
+      current.filter((_, index) => index !== indexToRemove)
+    );
   }
 
   async function handleSubmit(e: FormEvent) {
@@ -99,70 +150,94 @@ export default function CreateRoommatePage() {
         throw new Error("Please select a room type.");
       }
 
-      // Create the roommate listing first.
-      const { data: roommate, error: insertError } = await supabase
-        .from("roommates")
-        .insert({
-          user_id: user.id,
-          name: form.name.trim(),
-          college: form.college.trim(),
-          location: form.location.trim(),
-          budget: Number(form.budget),
-          room_type: form.room_type,
-          gender_preference: form.gender_preference || null,
-          preferences: form.preferences.trim() || null,
-          move_in_date: form.move_in_date || null,
-          description: form.description.trim() || null,
-          contact_preference: form.contact_preference || null,
-          status: "available",
-        })
-        .select("id")
-        .single();
-
-      if (insertError || !roommate) {
+      if (images.length > 5) {
         throw new Error(
-          insertError?.message || "Unable to create listing."
+          "You can upload a maximum of 5 photos."
         );
       }
 
-      // Upload image if one was selected.
-      if (image) {
-        const fileExtension =
-          image.name.split(".").pop()?.toLowerCase() || "jpg";
+      // Create the roommate listing first.
+      const { data: roommate, error: insertError } =
+        await supabase
+          .from("roommates")
+          .insert({
+            user_id: user.id,
+            name: form.name.trim(),
+            college: form.college.trim(),
+            location: form.location.trim(),
+            budget: Number(form.budget),
+            room_type: form.room_type,
+            gender_preference:
+              form.gender_preference || null,
+            preferences:
+              form.preferences.trim() || null,
+            move_in_date:
+              form.move_in_date || null,
+            description:
+              form.description.trim() || null,
+            contact_preference:
+              form.contact_preference || null,
+            status: "available",
+          })
+          .select("id")
+          .single();
 
-        const filePath = `${user.id}/${roommate.id}-${Date.now()}.${fileExtension}`;
+      if (insertError || !roommate) {
+        throw new Error(
+          insertError?.message ||
+            "Unable to create listing."
+        );
+      }
 
-        const { error: uploadError } = await supabase.storage
-          .from("roommate-images")
-          .upload(filePath, image, {
-            cacheControl: "3600",
-            upsert: false,
-          });
+      // Upload selected images.
+      if (images.length > 0) {
+        const imageUrls: string[] = [];
 
-        if (uploadError) {
-          throw new Error(
-            `Listing created, but image upload failed: ${uploadError.message}`
+        for (const image of images) {
+          const url = await uploadImage(
+            image,
+            "roommate-images"
           );
+
+          imageUrls.push(url);
         }
 
-        const {
-          data: { publicUrl },
-        } = supabase.storage
-          .from("roommate-images")
-          .getPublicUrl(filePath);
-
-        const { error: imageUpdateError } = await supabase
-          .from("roommates")
-          .update({
-            image_url: publicUrl,
-          })
-          .eq("id", roommate.id)
-          .eq("user_id", user.id);
+        // Save the first image as the main image.
+        const { error: imageUpdateError } =
+          await supabase
+            .from("roommates")
+            .update({
+              image_url: imageUrls[0],
+            })
+            .eq("id", roommate.id)
+            .eq("user_id", user.id);
 
         if (imageUpdateError) {
           throw new Error(
             `Listing created, but image could not be saved: ${imageUpdateError.message}`
           );
+        }
+
+        // Save remaining images in roommate_images.
+        if (imageUrls.length > 1) {
+          const additionalImages = imageUrls
+            .slice(1)
+            .map((imageUrl, index) => ({
+              roommate_id: roommate.id,
+              image_url: imageUrl,
+              display_order: index + 1,
+            }));
+
+          const { error: additionalImagesError } =
+            await supabase
+              .from("roommate_images")
+              .insert(additionalImages);
+
+          if (additionalImagesError) {
+            throw new Error(
+              `Listing created, but additional images could not be saved: ${additionalImagesError.message}`
+            );
+          }
         }
       }
 
@@ -214,7 +289,9 @@ export default function CreateRoommatePage() {
           <section className="rounded-xl border bg-card p-6">
             <div className="mb-5 flex items-center gap-2">
               <Users size={18} />
-              <h2 className="font-semibold">Basic Information</h2>
+              <h2 className="font-semibold">
+                Basic Information
+              </h2>
             </div>
 
             <div className="grid gap-5 sm:grid-cols-2">
@@ -302,7 +379,9 @@ export default function CreateRoommatePage() {
           <section className="rounded-xl border bg-card p-6">
             <div className="mb-5 flex items-center gap-2">
               <Home size={18} />
-              <h2 className="font-semibold">Room Requirements</h2>
+              <h2 className="font-semibold">
+                Room Requirements
+              </h2>
             </div>
 
             <div className="grid gap-5 sm:grid-cols-2">
@@ -322,13 +401,27 @@ export default function CreateRoommatePage() {
                   className="w-full rounded-lg border bg-background px-3 py-2.5 text-sm outline-none focus:ring-2"
                   required
                 >
-                  <option value="">Select room type</option>
-                  <option value="Single">Single Room</option>
-                  <option value="Shared">Shared Room</option>
-                  <option value="1BHK">1 BHK</option>
-                  <option value="2BHK">2 BHK</option>
-                  <option value="PG">PG</option>
-                  <option value="Other">Other</option>
+                  <option value="">
+                    Select room type
+                  </option>
+                  <option value="Single">
+                    Single Room
+                  </option>
+                  <option value="Shared">
+                    Shared Room
+                  </option>
+                  <option value="1BHK">
+                    1 BHK
+                  </option>
+                  <option value="2BHK">
+                    2 BHK
+                  </option>
+                  <option value="PG">
+                    PG
+                  </option>
+                  <option value="Other">
+                    Other
+                  </option>
                 </select>
               </div>
 
@@ -347,10 +440,18 @@ export default function CreateRoommatePage() {
                   onChange={handleChange}
                   className="w-full rounded-lg border bg-background px-3 py-2.5 text-sm outline-none focus:ring-2"
                 >
-                  <option value="">No preference</option>
-                  <option value="Male">Male</option>
-                  <option value="Female">Female</option>
-                  <option value="Any">Any</option>
+                  <option value="">
+                    No preference
+                  </option>
+                  <option value="Male">
+                    Male
+                  </option>
+                  <option value="Female">
+                    Female
+                  </option>
+                  <option value="Any">
+                    Any
+                  </option>
                 </select>
               </div>
 
@@ -387,20 +488,30 @@ export default function CreateRoommatePage() {
                   onChange={handleChange}
                   className="w-full rounded-lg border bg-background px-3 py-2.5 text-sm outline-none focus:ring-2"
                 >
-                  <option value="">Select preference</option>
-                  <option value="Chat">Chat on Marketplace</option>
-                  <option value="Phone">Phone</option>
-                  <option value="Email">Email</option>
+                  <option value="">
+                    Select preference
+                  </option>
+                  <option value="Chat">
+                    Chat on Marketplace
+                  </option>
+                  <option value="Phone">
+                    Phone
+                  </option>
+                  <option value="Email">
+                    Email
+                  </option>
                 </select>
               </div>
             </div>
           </section>
 
-          {/* Image */}
+          {/* Images */}
           <section className="rounded-xl border bg-card p-6">
             <div className="mb-5 flex items-center gap-2">
               <Upload size={18} />
-              <h2 className="font-semibold">Listing Image</h2>
+              <h2 className="font-semibold">
+                Listing Images
+              </h2>
             </div>
 
             <label
@@ -413,27 +524,65 @@ export default function CreateRoommatePage() {
               />
 
               <span className="text-sm font-medium">
-                {image ? image.name : "Choose an image"}
+                {images.length > 0
+                  ? `${images.length} photo${
+                      images.length > 1 ? "s" : ""
+                    } selected`
+                  : "Choose listing photos"}
               </span>
 
               <span className="mt-1 text-xs text-muted-foreground">
-                JPG, PNG, WEBP up to 5 MB
+                JPG, PNG, WEBP, HEIC up to 5 MB each · Max 5 photos
               </span>
 
               <input
                 id="image"
                 name="image"
                 type="file"
-                accept="image/*"
+                accept="image/*,.heic,.heif"
+                multiple
                 onChange={handleImageChange}
                 className="hidden"
               />
             </label>
 
-            {image && (
-              <p className="mt-3 text-xs text-muted-foreground">
-                Selected image: {image.name}
-              </p>
+            {/* Previews */}
+            {images.length > 0 && (
+              <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
+                {images.map((image, index) => (
+                  <div
+                    key={`${image.name}-${image.size}-${image.lastModified}`}
+                    className="relative overflow-hidden rounded-lg border bg-muted"
+                  >
+                    <div className="aspect-square">
+                      <img
+                        src={URL.createObjectURL(image)}
+                        alt={`Roommate listing photo ${
+                          index + 1
+                        }`}
+                        className="h-full w-full object-cover"
+                      />
+                    </div>
+
+                    {index === 0 && (
+                      <div className="absolute left-2 top-2 rounded-md bg-black/75 px-2 py-1 text-[10px] font-semibold text-white">
+                        Main
+                      </div>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() => removeImage(index)}
+                      aria-label={`Remove photo ${
+                        index + 1
+                      }`}
+                      className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-white/95 text-gray-800 shadow-md transition hover:bg-white"
+                    >
+                      <X size={15} />
+                    </button>
+                  </div>
+                ))}
+              </div>
             )}
           </section>
 
@@ -505,7 +654,9 @@ export default function CreateRoommatePage() {
               disabled={loading}
               className="rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {loading ? "Creating..." : "Create Listing"}
+              {loading
+                ? "Creating..."
+                : "Create Listing"}
             </button>
           </div>
         </form>
