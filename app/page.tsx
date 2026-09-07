@@ -2,6 +2,7 @@ import ProductCard from "../component/ProductCard";
 import WishlistButton from "../component/WishlistButton";
 import { supabase } from "../lib/supabase";
 import Link from "next/link";
+export const dynamic = "force-dynamic";
 import {
   ArrowRight,
   Home as HomeIcon,
