@@ -446,24 +446,31 @@ export default function EditProfilePage() {
           </div>
 
           {/* Buttons */}
-          <div className="mt-8 flex flex-col-reverse gap-3 border-t border-gray-200 pt-6 sm:flex-row sm:justify-end">
-            <Link
-              href="/profile"
-              className="inline-flex h-11 items-center justify-center rounded-lg border border-gray-300 bg-white px-5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 hover:text-gray-950"
-            >
-              Cancel
-            </Link>
+<div className="mt-8 flex flex-col gap-3 border-t border-gray-200 pt-6 sm:flex-row sm:items-center sm:justify-end">
+  <Link
+    href="/profile/change-password"
+    className="inline-flex h-11 items-center justify-center rounded-lg border border-gray-300 bg-white px-5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 hover:text-gray-950"
+  >
+    Change Password
+  </Link>
 
-            <button
-              type="submit"
-              disabled={saving}
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-gray-950 px-5 text-sm font-medium text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <Save size={17} />
+  <Link
+    href="/profile"
+    className="inline-flex h-11 items-center justify-center rounded-lg border border-gray-300 bg-white px-5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 hover:text-gray-950"
+  >
+    Cancel
+  </Link>
 
-              {saving ? "Saving..." : "Save Changes"}
-            </button>
-          </div>
+  <button
+    type="submit"
+    disabled={saving}
+    className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-gray-950 px-5 text-sm font-medium text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
+  >
+    <Save size={17} />
+
+    {saving ? "Saving..." : "Save Changes"}
+  </button>
+</div>
         </form>
       </div>
     </main>
