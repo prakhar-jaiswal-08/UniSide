@@ -1,11 +1,7 @@
 import { supabase } from "@/lib/supabase";
 
-export async function uploadImage(
-  file: File,
-  bucket: string = "product-images"
-) {
-  let uploadFile = file;
-  let fileExt = file.name.split(".").pop()?.toLowerCase();
+export async function prepareImageFile(file: File): Promise<File> {
+  const fileExt = file.name.split(".").pop()?.toLowerCase();
 
   const isHeic =
     fileExt === "heic" ||
@@ -13,35 +9,48 @@ export async function uploadImage(
     file.type === "image/heic" ||
     file.type === "image/heif";
 
-  if (isHeic) {
-    try {
-      const heic2any = (await import("heic2any")).default;
-
-      const converted = await heic2any({
-        blob: file,
-        toType: "image/jpeg",
-        quality: 0.9,
-      });
-
-      const jpegBlob = Array.isArray(converted)
-        ? converted[0]
-        : converted;
-
-      uploadFile = new File(
-        [jpegBlob],
-        file.name.replace(/\.(heic|heif)$/i, ".jpg"),
-        {
-          type: "image/jpeg",
-        }
-      );
-
-      fileExt = "jpg";
-    } catch {
-      throw new Error(
-        "HEIC image could not be converted. Please try a JPG or PNG image."
-      );
-    }
+  if (!isHeic) {
+    return file;
   }
+
+  try {
+    const heic2any = (await import("heic2any")).default;
+
+    const converted = await heic2any({
+      blob: file,
+      toType: "image/jpeg",
+      quality: 0.8,
+    });
+
+    const jpegBlob = Array.isArray(converted)
+      ? converted[0]
+      : converted;
+
+    return new File(
+      [jpegBlob],
+      file.name.replace(/\.(heic|heif)$/i, ".jpg"),
+      {
+        type: "image/jpeg",
+        lastModified: file.lastModified,
+      }
+    );
+  } catch (error) {
+    console.error("HEIC conversion failed:", error);
+
+    throw new Error(
+      "This HEIC image could not be processed on this device. Please try saving it as JPG and upload again."
+    );
+  }
+}
+
+export async function uploadImage(
+  file: File,
+  bucket: string = "product-images"
+) {
+  const uploadFile = await prepareImageFile(file);
+
+  const fileExt =
+    uploadFile.name.split(".").pop()?.toLowerCase() || "jpg";
 
   const fileName = `${Date.now()}-${Math.random()
     .toString(36)
@@ -54,7 +63,11 @@ export async function uploadImage(
     });
 
   if (uploadError) {
-    throw new Error(uploadError.message);
+    console.error("Image upload failed:", uploadError);
+
+    throw new Error(
+      "Image upload failed. Please try again."
+    );
   }
 
   const { data } = supabase.storage

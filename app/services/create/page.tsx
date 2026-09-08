@@ -3,7 +3,10 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { uploadImage } from "@/lib/uploadImage";
+import {
+  prepareImageFile,
+  uploadImage,
+} from "@/lib/uploadImage";
 import { toast } from "sonner";
 import { Wrench, Upload, X } from "lucide-react";
 
@@ -19,43 +22,78 @@ export default function CreateServicePage() {
   const [location, setLocation] = useState("");
 
   const [images, setImages] = useState<File[]>([]);
+  const [processingImages, setProcessingImages] =
+    useState(false);
   const [uploading, setUploading] = useState(false);
 
-  const handleImageChange = (
+  const handleImageChange = async (
     e: React.ChangeEvent<HTMLInputElement>
   ) => {
     if (!e.target.files) return;
 
     const selectedFiles = Array.from(e.target.files);
 
-    setImages((current) => {
-      const combined = [...current, ...selectedFiles];
+    if (selectedFiles.length === 0) {
+      e.target.value = "";
+      return;
+    }
 
-      const unique = combined.filter(
-        (file, index, array) =>
-          index ===
-          array.findIndex(
-            (item) =>
-              item.name === file.name &&
-              item.size === file.size &&
-              item.lastModified === file.lastModified
-          )
-      );
+    setProcessingImages(true);
 
-      if (unique.length > 5) {
-        toast.error("You can upload a maximum of 5 photos.");
-        return unique.slice(0, 5);
+    try {
+      const preparedFiles: File[] = [];
+
+      for (const file of selectedFiles) {
+        const preparedFile =
+          await prepareImageFile(file);
+
+        preparedFiles.push(preparedFile);
       }
 
-      return unique;
-    });
+      setImages((current) => {
+        const combined = [
+          ...current,
+          ...preparedFiles,
+        ];
 
-    e.target.value = "";
+        const unique = combined.filter(
+          (file, index, array) =>
+            index ===
+            array.findIndex(
+              (item) =>
+                item.name === file.name &&
+                item.size === file.size &&
+                item.lastModified === file.lastModified
+            )
+        );
+
+        if (unique.length > 5) {
+          toast.error(
+            "You can upload a maximum of 5 photos."
+          );
+
+          return unique.slice(0, 5);
+        }
+
+        return unique;
+      });
+    } catch (err) {
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : "Unable to process the selected image."
+      );
+    } finally {
+      setProcessingImages(false);
+      e.target.value = "";
+    }
   };
 
   const removeImage = (indexToRemove: number) => {
     setImages((current) =>
-      current.filter((_, index) => index !== indexToRemove)
+      current.filter(
+        (_, index) => index !== indexToRemove
+      )
     );
   };
 
@@ -88,7 +126,9 @@ export default function CreateServicePage() {
     }
 
     if (images.length > 5) {
-      toast.error("You can upload a maximum of 5 photos.");
+      toast.error(
+        "You can upload a maximum of 5 photos."
+      );
       return;
     }
 
@@ -106,24 +146,28 @@ export default function CreateServicePage() {
         imageUrls.push(url);
       }
 
-      const { data: service, error } = await supabase
-        .from("services")
-        .insert({
-          user_id: user.id,
-          title,
-          description,
-          category,
-          price: price ? Number(price) : null,
-          pricing_type: pricingType,
-          status,
-          location,
-          image_url: imageUrls[0] || "",
-        })
-        .select("id")
-        .single();
+      const { data: service, error } =
+        await supabase
+          .from("services")
+          .insert({
+            user_id: user.id,
+            title,
+            description,
+            category,
+            price: price ? Number(price) : null,
+            pricing_type: pricingType,
+            status,
+            location,
+            image_url: imageUrls[0] || "",
+          })
+          .select("id")
+          .single();
 
-      if (error) {
-        toast.error(error.message);
+      if (error || !service) {
+        toast.error(
+          error?.message ||
+            "Failed to create service."
+        );
         return;
       }
 
@@ -136,17 +180,22 @@ export default function CreateServicePage() {
             display_order: index + 1,
           }));
 
-        const { error: imagesError } = await supabase
-          .from("service_images")
-          .insert(additionalImages);
+        const { error: imagesError } =
+          await supabase
+            .from("service_images")
+            .insert(additionalImages);
 
         if (imagesError) {
-          toast.error(imagesError.message);
+          toast.error(
+            "Service was created, but additional images could not be saved."
+          );
           return;
         }
       }
 
-      toast.success("Service posted successfully!");
+      toast.success(
+        "Service posted successfully!"
+      );
 
       router.push("/services");
     } catch (err) {
@@ -198,7 +247,9 @@ export default function CreateServicePage() {
 
               <input
                 value={title}
-                onChange={(e) => setTitle(e.target.value)}
+                onChange={(e) =>
+                  setTitle(e.target.value)
+                }
                 className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-gray-900 outline-none transition placeholder:text-gray-400 focus:border-gray-500 focus:ring-2 focus:ring-gray-200"
                 placeholder="Math Tutor"
               />
@@ -212,10 +263,14 @@ export default function CreateServicePage() {
 
               <select
                 value={category}
-                onChange={(e) => setCategory(e.target.value)}
+                onChange={(e) =>
+                  setCategory(e.target.value)
+                }
                 className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-gray-900 outline-none transition"
               >
-                <option value="">Select Category</option>
+                <option value="">
+                  Select Category
+                </option>
                 <option>Tutoring</option>
                 <option>Programming</option>
                 <option>Graphic Design</option>
@@ -255,7 +310,9 @@ export default function CreateServicePage() {
 
                 <input
                   value={price}
-                  onChange={(e) => setPrice(e.target.value)}
+                  onChange={(e) =>
+                    setPrice(e.target.value)
+                  }
                   type="number"
                   min="0"
                   className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-gray-900 outline-none transition placeholder:text-gray-400 focus:border-gray-500 focus:ring-2 focus:ring-gray-200"
@@ -275,10 +332,18 @@ export default function CreateServicePage() {
                   }
                   className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-gray-900 outline-none transition"
                 >
-                  <option value="Fixed">Fixed</option>
-                  <option value="Per Hour">Per Hour</option>
-                  <option value="Per Day">Per Day</option>
-                  <option value="Free">Free</option>
+                  <option value="Fixed">
+                    Fixed
+                  </option>
+                  <option value="Per Hour">
+                    Per Hour
+                  </option>
+                  <option value="Per Day">
+                    Per Day
+                  </option>
+                  <option value="Free">
+                    Free
+                  </option>
                 </select>
               </div>
             </div>
@@ -291,12 +356,20 @@ export default function CreateServicePage() {
 
               <select
                 value={status}
-                onChange={(e) => setStatus(e.target.value)}
+                onChange={(e) =>
+                  setStatus(e.target.value)
+                }
                 className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-gray-900 outline-none transition"
               >
-                <option value="Available">Available</option>
-                <option value="Reserved">Reserved</option>
-                <option value="Completed">Unavailable</option>
+                <option value="Available">
+                  Available
+                </option>
+                <option value="Reserved">
+                  Reserved
+                </option>
+                <option value="Completed">
+                  Unavailable
+                </option>
               </select>
             </div>
 
@@ -308,7 +381,9 @@ export default function CreateServicePage() {
 
               <input
                 value={location}
-                onChange={(e) => setLocation(e.target.value)}
+                onChange={(e) =>
+                  setLocation(e.target.value)
+                }
                 className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-gray-900 outline-none transition placeholder:text-gray-400 focus:border-gray-500 focus:ring-2 focus:ring-gray-200"
                 placeholder="Online / Hostel A / Library"
               />
@@ -327,11 +402,15 @@ export default function CreateServicePage() {
 
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-gray-900">
-                    {images.length > 0
-                      ? `${images.length} photo${
-                          images.length > 1 ? "s" : ""
-                        } selected`
-                      : "Choose service photos"}
+                    {processingImages
+                      ? "Processing images..."
+                      : images.length > 0
+                        ? `${images.length} photo${
+                            images.length > 1
+                              ? "s"
+                              : ""
+                          } selected`
+                        : "Choose service photos"}
                   </p>
 
                   <p className="mt-0.5 text-xs text-gray-500">
@@ -343,6 +422,10 @@ export default function CreateServicePage() {
                   type="file"
                   accept="image/*,.heic,.heif"
                   multiple
+                  disabled={
+                    processingImages ||
+                    uploading
+                  }
                   onChange={handleImageChange}
                   className="hidden"
                 />
@@ -359,7 +442,9 @@ export default function CreateServicePage() {
                       <div className="aspect-square">
                         <img
                           src={URL.createObjectURL(image)}
-                          alt={`Service photo ${index + 1}`}
+                          alt={`Service photo ${
+                            index + 1
+                          }`}
                           className="h-full w-full object-cover"
                         />
                       </div>
@@ -372,9 +457,17 @@ export default function CreateServicePage() {
 
                       <button
                         type="button"
-                        onClick={() => removeImage(index)}
-                        aria-label={`Remove photo ${index + 1}`}
-                        className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-white/95 text-gray-800 shadow-md transition hover:bg-white"
+                        onClick={() =>
+                          removeImage(index)
+                        }
+                        disabled={
+                          processingImages ||
+                          uploading
+                        }
+                        aria-label={`Remove photo ${
+                          index + 1
+                        }`}
+                        className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-white/95 text-gray-800 shadow-md transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         <X size={15} />
                       </button>
@@ -389,12 +482,16 @@ export default function CreateServicePage() {
           <div className="mt-8 border-t border-gray-200 pt-6">
             <button
               type="submit"
-              disabled={uploading}
+              disabled={
+                uploading || processingImages
+              }
               className="w-full rounded-lg bg-gray-900 py-3 font-semibold text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {uploading
-                ? "Uploading..."
-                : "Offer Service"}
+              {processingImages
+                ? "Processing Images..."
+                : uploading
+                  ? "Uploading..."
+                  : "Offer Service"}
             </button>
           </div>
         </form>

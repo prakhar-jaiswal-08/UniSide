@@ -11,7 +11,10 @@ import {
   X,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { uploadImage } from "@/lib/uploadImage";
+import {
+  prepareImageFile,
+  uploadImage,
+} from "@/lib/uploadImage";
 
 export default function CreateRoommatePage() {
   const router = useRouter();
@@ -31,6 +34,8 @@ export default function CreateRoommatePage() {
 
   const [images, setImages] = useState<File[]>([]);
   const [loading, setLoading] = useState(false);
+  const [processingImages, setProcessingImages] =
+    useState(false);
   const [error, setError] = useState("");
 
   function handleChange(
@@ -44,73 +49,84 @@ export default function CreateRoommatePage() {
     });
   }
 
-  function handleImageChange(
+  async function handleImageChange(
     e: React.ChangeEvent<HTMLInputElement>
   ) {
     if (!e.target.files) return;
 
     const selectedFiles = Array.from(e.target.files);
 
-    const validFiles = selectedFiles.filter((file) => {
-      const fileExtension =
-        file.name.split(".").pop()?.toLowerCase();
-
-      const isImage =
-        file.type.startsWith("image/") ||
-        fileExtension === "heic" ||
-        fileExtension === "heif";
-
-      if (!isImage) {
-        setError(
-          "Please select valid image files."
-        );
-        return false;
-      }
-
-      if (file.size > 5 * 1024 * 1024) {
-        setError(
-          `${file.name} is larger than 5 MB.`
-        );
-        return false;
-      }
-
-      return true;
-    });
-
-    if (validFiles.length === 0) {
+    if (selectedFiles.length === 0) {
       e.target.value = "";
       return;
     }
 
-    setImages((current) => {
-      const combined = [...current, ...validFiles];
+    setProcessingImages(true);
+    setError("");
 
-      const unique = combined.filter(
-        (file, index, array) =>
-          index ===
-          array.findIndex(
-            (item) =>
-              item.name === file.name &&
-              item.size === file.size &&
-              item.lastModified === file.lastModified
-          )
-      );
+    try {
+      const preparedFiles: File[] = [];
 
-      if (unique.length > 5) {
-        setError("You can upload a maximum of 5 photos.");
-        return unique.slice(0, 5);
+      for (const file of selectedFiles) {
+        if (
+          file.size > 5 * 1024 * 1024
+        ) {
+          throw new Error(
+            `${file.name} is larger than 5 MB.`
+          );
+        }
+
+        const preparedFile =
+          await prepareImageFile(file);
+
+        preparedFiles.push(preparedFile);
       }
 
-      setError("");
-      return unique;
-    });
+      setImages((current) => {
+        const combined = [
+          ...current,
+          ...preparedFiles,
+        ];
 
-    e.target.value = "";
+        const unique = combined.filter(
+          (file, index, array) =>
+            index ===
+            array.findIndex(
+              (item) =>
+                item.name === file.name &&
+                item.size === file.size &&
+                item.lastModified ===
+                  file.lastModified
+            )
+        );
+
+        if (unique.length > 5) {
+          setError(
+            "You can upload a maximum of 5 photos."
+          );
+
+          return unique.slice(0, 5);
+        }
+
+        return unique;
+      });
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Unable to process the selected image."
+      );
+    } finally {
+      setProcessingImages(false);
+      e.target.value = "";
+    }
   }
 
   function removeImage(indexToRemove: number) {
     setImages((current) =>
-      current.filter((_, index) => index !== indexToRemove)
+      current.filter(
+        (_, index) => index !== indexToRemove
+      )
     );
   }
 
@@ -131,23 +147,36 @@ export default function CreateRoommatePage() {
       }
 
       if (!form.name.trim()) {
-        throw new Error("Please enter your name.");
+        throw new Error(
+          "Please enter your name."
+        );
       }
 
       if (!form.college.trim()) {
-        throw new Error("Please enter your college.");
+        throw new Error(
+          "Please enter your college."
+        );
       }
 
       if (!form.location.trim()) {
-        throw new Error("Please enter your location.");
+        throw new Error(
+          "Please enter your location."
+        );
       }
 
-      if (!form.budget || Number(form.budget) < 0) {
-        throw new Error("Please enter a valid budget.");
+      if (
+        !form.budget ||
+        Number(form.budget) < 0
+      ) {
+        throw new Error(
+          "Please enter a valid budget."
+        );
       }
 
       if (!form.room_type) {
-        throw new Error("Please select a room type.");
+        throw new Error(
+          "Please select a room type."
+        );
       }
 
       if (images.length > 5) {
@@ -202,7 +231,7 @@ export default function CreateRoommatePage() {
           imageUrls.push(url);
         }
 
-        // Save the first image as the main image.
+        // First image becomes the main image.
         const { error: imageUpdateError } =
           await supabase
             .from("roommates")
@@ -218,7 +247,7 @@ export default function CreateRoommatePage() {
           );
         }
 
-        // Save remaining images in roommate_images.
+        // Remaining images go into roommate_images.
         if (imageUrls.length > 1) {
           const additionalImages = imageUrls
             .slice(1)
@@ -228,20 +257,23 @@ export default function CreateRoommatePage() {
               display_order: index + 1,
             }));
 
-          const { error: additionalImagesError } =
-            await supabase
-              .from("roommate_images")
-              .insert(additionalImages);
+          const {
+            error: additionalImagesError,
+          } = await supabase
+            .from("roommate_images")
+            .insert(additionalImages);
 
           if (additionalImagesError) {
             throw new Error(
-              `Listing created, but additional images could not be saved: ${additionalImagesError.message}`
+              "Listing created, but additional images could not be saved."
             );
           }
         }
       }
 
-      router.push(`/roommates/${roommate.id}`);
+      router.push(
+        `/roommates/${roommate.id}`
+      );
       router.refresh();
     } catch (err) {
       setError(
@@ -257,6 +289,7 @@ export default function CreateRoommatePage() {
   return (
     <main className="min-h-screen bg-background">
       <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 lg:px-8">
+
         <Link
           href="/roommates"
           className="mb-6 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
@@ -284,7 +317,10 @@ export default function CreateRoommatePage() {
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form
+          onSubmit={handleSubmit}
+          className="space-y-6"
+        >
           {/* Basic Information */}
           <section className="rounded-xl border bg-card p-6">
             <div className="mb-5 flex items-center gap-2">
@@ -524,11 +560,15 @@ export default function CreateRoommatePage() {
               />
 
               <span className="text-sm font-medium">
-                {images.length > 0
-                  ? `${images.length} photo${
-                      images.length > 1 ? "s" : ""
-                    } selected`
-                  : "Choose listing photos"}
+                {processingImages
+                  ? "Processing images..."
+                  : images.length > 0
+                    ? `${images.length} photo${
+                        images.length > 1
+                          ? "s"
+                          : ""
+                      } selected`
+                    : "Choose listing photos"}
               </span>
 
               <span className="mt-1 text-xs text-muted-foreground">
@@ -541,12 +581,15 @@ export default function CreateRoommatePage() {
                 type="file"
                 accept="image/*,.heic,.heif"
                 multiple
+                disabled={
+                  processingImages ||
+                  loading
+                }
                 onChange={handleImageChange}
                 className="hidden"
               />
             </label>
 
-            {/* Previews */}
             {images.length > 0 && (
               <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
                 {images.map((image, index) => (
@@ -572,11 +615,17 @@ export default function CreateRoommatePage() {
 
                     <button
                       type="button"
-                      onClick={() => removeImage(index)}
+                      onClick={() =>
+                        removeImage(index)
+                      }
+                      disabled={
+                        processingImages ||
+                        loading
+                      }
                       aria-label={`Remove photo ${
                         index + 1
                       }`}
-                      className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-white/95 text-gray-800 shadow-md transition hover:bg-white"
+                      className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-white/95 text-gray-800 shadow-md transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       <X size={15} />
                     </button>
@@ -651,12 +700,16 @@ export default function CreateRoommatePage() {
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={
+                loading || processingImages
+              }
               className="rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {loading
-                ? "Creating..."
-                : "Create Listing"}
+              {processingImages
+                ? "Processing Images..."
+                : loading
+                  ? "Creating..."
+                  : "Create Listing"}
             </button>
           </div>
         </form>

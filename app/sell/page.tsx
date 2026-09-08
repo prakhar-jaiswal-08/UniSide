@@ -1,6 +1,9 @@
 "use client";
 
-import { uploadImage } from "@/lib/uploadImage";
+import {
+  prepareImageFile,
+  uploadImage,
+} from "@/lib/uploadImage";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
@@ -13,6 +16,7 @@ export default function SellPage() {
   const [category, setCategory] = useState("Others");
   const [images, setImages] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [processingImages, setProcessingImages] = useState(false);
 
   const router = useRouter();
 
@@ -30,36 +34,62 @@ export default function SellPage() {
     checkUser();
   }, [router]);
 
-  const handleImageChange = (
+  const handleImageChange = async (
     e: React.ChangeEvent<HTMLInputElement>
   ) => {
     if (!e.target.files) return;
 
     const selectedFiles = Array.from(e.target.files);
 
-    setImages((current) => {
-      const combined = [...current, ...selectedFiles];
+    if (selectedFiles.length === 0) {
+      e.target.value = "";
+      return;
+    }
 
-      const unique = combined.filter(
-        (file, index, array) =>
-          index ===
-          array.findIndex(
-            (item) =>
-              item.name === file.name &&
-              item.size === file.size &&
-              item.lastModified === file.lastModified
-          )
-      );
+    setProcessingImages(true);
 
-      if (unique.length > 5) {
-        toast.error("You can upload a maximum of 5 photos.");
-        return unique.slice(0, 5);
+    try {
+      const preparedFiles: File[] = [];
+
+      for (const file of selectedFiles) {
+        const preparedFile = await prepareImageFile(file);
+        preparedFiles.push(preparedFile);
       }
 
-      return unique;
-    });
+      setImages((current) => {
+        const combined = [...current, ...preparedFiles];
 
-    e.target.value = "";
+        const unique = combined.filter(
+          (file, index, array) =>
+            index ===
+            array.findIndex(
+              (item) =>
+                item.name === file.name &&
+                item.size === file.size &&
+                item.lastModified === file.lastModified
+            )
+        );
+
+        if (unique.length > 5) {
+          toast.error(
+            "You can upload a maximum of 5 photos."
+          );
+
+          return unique.slice(0, 5);
+        }
+
+        return unique;
+      });
+    } catch (err) {
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : "Unable to process the selected image."
+      );
+    } finally {
+      setProcessingImages(false);
+      e.target.value = "";
+    }
   };
 
   const removeImage = (index: number) => {
@@ -173,7 +203,10 @@ export default function SellPage() {
         </div>
 
         <div className="rounded-xl border border-gray-300 bg-white p-6 shadow-md sm:p-8">
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form
+            onSubmit={handleSubmit}
+            className="space-y-5"
+          >
 
             <div>
               <label
@@ -270,11 +303,14 @@ export default function SellPage() {
                 accept="image/*,.heic,.heif"
                 multiple
                 onChange={handleImageChange}
-                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-700 file:mr-4 file:rounded-md file:border-0 file:bg-gray-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-gray-700 hover:file:bg-gray-200"
+                disabled={processingImages || uploading}
+                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-700 file:mr-4 file:rounded-md file:border-0 file:bg-gray-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-gray-700 hover:file:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-60"
               />
 
               <p className="mt-2 text-xs text-gray-500">
-                Select up to 5 photos. HEIC and HEIF images are supported.
+                {processingImages
+                  ? "Processing selected images..."
+                  : "Select up to 5 photos. HEIC and HEIF images are supported."}
               </p>
 
               {images.length > 0 && (
@@ -293,7 +329,8 @@ export default function SellPage() {
                       <button
                         type="button"
                         onClick={() => removeImage(index)}
-                        className="absolute right-1.5 top-1.5 rounded-md bg-gray-900 px-2 py-1 text-xs font-medium text-white transition hover:bg-gray-800"
+                        disabled={processingImages || uploading}
+                        className="absolute right-1.5 top-1.5 rounded-md bg-gray-900 px-2 py-1 text-xs font-medium text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         Remove
                       </button>
@@ -312,10 +349,16 @@ export default function SellPage() {
             <div className="pt-2">
               <button
                 type="submit"
-                disabled={uploading}
+                disabled={
+                  uploading || processingImages
+                }
                 className="w-full rounded-lg bg-gray-900 py-3 text-sm font-semibold text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {uploading ? "Uploading..." : "List Product"}
+                {processingImages
+                  ? "Processing Images..."
+                  : uploading
+                    ? "Uploading..."
+                    : "List Product"}
               </button>
             </div>
 
