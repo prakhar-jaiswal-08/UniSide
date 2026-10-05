@@ -15,25 +15,27 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://uniside.in"),
+  metadataBase: new URL("https://uniside.vercel.app"),
 
   title: {
-    default: "Uniside — College Marketplace",
+    default: "Uniside — College Marketplace for Students",
     template: "%s | Uniside",
   },
 
   description:
-    "Buy, sell, find services, roommates, and connect with students on your college campus.",
+    "Uniside is a college marketplace where students can buy and sell products, find services and roommates, and connect with their campus community.",
 
   applicationName: "Uniside",
 
   keywords: [
+    "Uniside",
     "college marketplace",
     "campus marketplace",
     "student marketplace",
     "college students",
     "buy and sell college",
     "college services",
+    "student services",
     "student roommates",
     "campus community",
   ],
@@ -41,22 +43,26 @@ export const metadata: Metadata = {
   robots: {
     index: true,
     follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+    },
   },
 
   openGraph: {
     type: "website",
     siteName: "Uniside",
-    title: "Uniside — College Marketplace",
+    title: "Uniside — College Marketplace for Students",
     description:
-      "Buy, sell, find services, roommates, and connect with students on your college campus.",
-    url: "https://uniside.in",
+      "Buy and sell products, find services and roommates, and connect with students on your college campus.",
+    url: "https://uniside.vercel.app",
   },
 
   twitter: {
     card: "summary",
-    title: "Uniside — College Marketplace",
+    title: "Uniside — College Marketplace for Students",
     description:
-      "Buy, sell, find services, roommates, and connect with students on your college campus.",
+      "Buy and sell products, find services and roommates, and connect with students on your college campus.",
   },
 };
 

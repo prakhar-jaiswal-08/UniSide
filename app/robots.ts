@@ -18,6 +18,6 @@ export default function robots(): MetadataRoute.Robots {
         "/feed/edit/",
       ],
     },
-    sitemap: "https://uniside.in/sitemap.xml",
+    sitemap: "https://uniside.vercel.app/sitemap.xml",
   };
 }
