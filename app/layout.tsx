@@ -17,6 +17,11 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   metadataBase: new URL("https://uniside.vercel.app"),
 
+  verification: {
+    google:
+      "Hhd8cg_XdZEkSpORWzB43fvR89Qc2qGDPj12lx9lnks",
+  },
+
   title: {
     default: "Uniside — College Marketplace for Students",
     template: "%s | Uniside",
