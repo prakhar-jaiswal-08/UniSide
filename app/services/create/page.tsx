@@ -3,10 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import {
-  prepareImageFile,
-  uploadImage,
-} from "@/lib/uploadImage";
+import { uploadServiceImage } from "@/lib/uploadServiceImage";
 import { toast } from "sonner";
 import { Wrench, Upload, X } from "lucide-react";
 
@@ -22,11 +19,9 @@ export default function CreateServicePage() {
   const [location, setLocation] = useState("");
 
   const [images, setImages] = useState<File[]>([]);
-  const [processingImages, setProcessingImages] =
-    useState(false);
   const [uploading, setUploading] = useState(false);
 
-  const handleImageChange = async (
+  const handleImageChange = (
     e: React.ChangeEvent<HTMLInputElement>
   ) => {
     if (!e.target.files) return;
@@ -38,55 +33,32 @@ export default function CreateServicePage() {
       return;
     }
 
-    setProcessingImages(true);
+    setImages((current) => {
+      const combined = [...current, ...selectedFiles];
 
-    try {
-      const preparedFiles: File[] = [];
+      const unique = combined.filter(
+        (file, index, array) =>
+          index ===
+          array.findIndex(
+            (item) =>
+              item.name === file.name &&
+              item.size === file.size &&
+              item.lastModified === file.lastModified
+          )
+      );
 
-      for (const file of selectedFiles) {
-        const preparedFile =
-          await prepareImageFile(file);
-
-        preparedFiles.push(preparedFile);
-      }
-
-      setImages((current) => {
-        const combined = [
-          ...current,
-          ...preparedFiles,
-        ];
-
-        const unique = combined.filter(
-          (file, index, array) =>
-            index ===
-            array.findIndex(
-              (item) =>
-                item.name === file.name &&
-                item.size === file.size &&
-                item.lastModified === file.lastModified
-            )
+      if (unique.length > 5) {
+        toast.error(
+          "You can upload a maximum of 5 photos."
         );
 
-        if (unique.length > 5) {
-          toast.error(
-            "You can upload a maximum of 5 photos."
-          );
+        return unique.slice(0, 5);
+      }
 
-          return unique.slice(0, 5);
-        }
+      return unique;
+    });
 
-        return unique;
-      });
-    } catch (err) {
-      toast.error(
-        err instanceof Error
-          ? err.message
-          : "Unable to process the selected image."
-      );
-    } finally {
-      setProcessingImages(false);
-      e.target.value = "";
-    }
+    e.target.value = "";
   };
 
   const removeImage = (indexToRemove: number) => {
@@ -138,9 +110,9 @@ export default function CreateServicePage() {
       const imageUrls: string[] = [];
 
       for (const image of images) {
-        const url = await uploadImage(
+        const url = await uploadServiceImage(
           image,
-          "service-images"
+          user.id
         );
 
         imageUrls.push(url);
@@ -213,7 +185,6 @@ export default function CreateServicePage() {
     <main className="min-h-screen bg-gray-100 px-6 py-12 font-sans">
       <div className="mx-auto max-w-3xl">
 
-        {/* Header */}
         <div className="mb-8">
           <div className="flex items-center gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gray-900 text-white">
@@ -232,14 +203,12 @@ export default function CreateServicePage() {
           </div>
         </div>
 
-        {/* Form Card */}
         <form
           onSubmit={handleSubmit}
           className="rounded-xl border border-gray-300 bg-white p-6 shadow-md sm:p-8"
         >
           <div className="space-y-6">
 
-            {/* Service Title */}
             <div>
               <label className="mb-2 block text-sm font-semibold text-gray-900">
                 Service Title
@@ -255,7 +224,6 @@ export default function CreateServicePage() {
               />
             </div>
 
-            {/* Category */}
             <div>
               <label className="mb-2 block text-sm font-semibold text-gray-900">
                 Category
@@ -285,7 +253,6 @@ export default function CreateServicePage() {
               </select>
             </div>
 
-            {/* Description */}
             <div>
               <label className="mb-2 block text-sm font-semibold text-gray-900">
                 Description
@@ -301,7 +268,6 @@ export default function CreateServicePage() {
               />
             </div>
 
-            {/* Price + Pricing Type */}
             <div className="grid gap-6 md:grid-cols-2">
               <div>
                 <label className="mb-2 block text-sm font-semibold text-gray-900">
@@ -348,7 +314,6 @@ export default function CreateServicePage() {
               </div>
             </div>
 
-            {/* Status */}
             <div>
               <label className="mb-2 block text-sm font-semibold text-gray-900">
                 Status
@@ -373,7 +338,6 @@ export default function CreateServicePage() {
               </select>
             </div>
 
-            {/* Location */}
             <div>
               <label className="mb-2 block text-sm font-semibold text-gray-900">
                 Location
@@ -389,7 +353,6 @@ export default function CreateServicePage() {
               />
             </div>
 
-            {/* Images */}
             <div>
               <label className="mb-2 block text-sm font-semibold text-gray-900">
                 Service Images
@@ -402,15 +365,13 @@ export default function CreateServicePage() {
 
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-gray-900">
-                    {processingImages
-                      ? "Processing images..."
-                      : images.length > 0
-                        ? `${images.length} photo${
-                            images.length > 1
-                              ? "s"
-                              : ""
-                          } selected`
-                        : "Choose service photos"}
+                    {images.length > 0
+                      ? `${images.length} photo${
+                          images.length > 1
+                            ? "s"
+                            : ""
+                        } selected`
+                      : "Choose service photos"}
                   </p>
 
                   <p className="mt-0.5 text-xs text-gray-500">
@@ -422,16 +383,12 @@ export default function CreateServicePage() {
                   type="file"
                   accept="image/*,.heic,.heif"
                   multiple
-                  disabled={
-                    processingImages ||
-                    uploading
-                  }
+                  disabled={uploading}
                   onChange={handleImageChange}
                   className="hidden"
                 />
               </label>
 
-              {/* Image Previews */}
               {images.length > 0 && (
                 <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
                   {images.map((image, index) => (
@@ -460,10 +417,7 @@ export default function CreateServicePage() {
                         onClick={() =>
                           removeImage(index)
                         }
-                        disabled={
-                          processingImages ||
-                          uploading
-                        }
+                        disabled={uploading}
                         aria-label={`Remove photo ${
                           index + 1
                         }`}
@@ -478,20 +432,15 @@ export default function CreateServicePage() {
             </div>
           </div>
 
-          {/* Submit */}
           <div className="mt-8 border-t border-gray-200 pt-6">
             <button
               type="submit"
-              disabled={
-                uploading || processingImages
-              }
+              disabled={uploading}
               className="w-full rounded-lg bg-gray-900 py-3 font-semibold text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {processingImages
-                ? "Processing Images..."
-                : uploading
-                  ? "Uploading..."
-                  : "Offer Service"}
+              {uploading
+                ? "Uploading..."
+                : "Offer Service"}
             </button>
           </div>
         </form>

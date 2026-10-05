@@ -1,14 +1,14 @@
-import Link from "next/link";
 import Image from "next/image";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
-  User,
-  Wrench,
+  ArrowLeft,
   MapPin,
-  CheckCircle,
-  Clock3,
-  XCircle,
+  Package,
+  Wrench,
+  Home,
 } from "lucide-react";
+
 import { createClient } from "@/lib/supabase-server";
 
 type Props = {
@@ -17,216 +17,415 @@ type Props = {
   }>;
 };
 
-export default async function PublicProviderProfile({
+export default async function PublicProfilePage({
   params,
 }: Props) {
   const { id } = await params;
 
   const supabase = await createClient();
 
-  /* Provider */
-
-  const { data: provider, error: providerError } =
+  // Public profile information
+  const { data: profile, error: profileError } =
     await supabase
-      .from("profiles")
-      .select("id, name")
+      .from("public_profiles")
+      .select(
+        "id, name, age, college, department, year"
+      )
       .eq("id", id)
       .single();
 
-  if (providerError || !provider) {
+  if (profileError || !profile) {
     notFound();
   }
 
-  /* Provider services */
+  // Fetch all listings created by this user
+  const [
+    { data: products },
+    { data: services },
+    { data: roommates },
+  ] = await Promise.all([
+    supabase
+      .from("products")
+      .select(
+        "id, name, price, image_url, category, created_at"
+      )
+      .eq("user_id", id)
+      .order("created_at", {
+        ascending: false,
+      }),
 
-  const { data: services } = await supabase
-    .from("services")
-    .select("*")
-    .eq("user_id", id)
-    .order("created_at", {
-      ascending: false,
-    });
+    supabase
+      .from("services")
+      .select(
+        "id, title, description, category, location, price, pricing_type, image_url, status, created_at"
+      )
+      .eq("user_id", id)
+      .order("created_at", {
+        ascending: false,
+      }),
+
+    supabase
+      .from("roommates")
+      .select(
+        "id, name, location, budget, room_type, image_url, status, created_at"
+      )
+      .eq("user_id", id)
+      .order("created_at", {
+        ascending: false,
+      }),
+  ]);
+
+  const productListings = products ?? [];
+  const serviceListings = services ?? [];
+  const roommateListings = roommates ?? [];
+
+  const totalListings =
+    productListings.length +
+    serviceListings.length +
+    roommateListings.length;
 
   return (
-    <main className="mx-auto max-w-7xl px-6 py-10">
+    <main className="min-h-screen bg-gray-100 px-5 py-8 font-sans text-gray-900 sm:px-6 lg:px-8 lg:py-10">
+      <div className="mx-auto max-w-6xl">
 
-      {/* Back */}
+        {/* Back */}
+        <Link
+          href="/"
+          className="inline-flex items-center gap-2 text-sm font-medium text-gray-600 transition hover:text-gray-950"
+        >
+          <ArrowLeft size={17} />
+          Back
+        </Link>
 
-      <Link
-        href="/services"
-        className="mb-8 inline-block text-blue-600 hover:underline"
-      >
-        ← Back to Services
-      </Link>
+        {/* Profile Header */}
+        <section className="mt-6 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+          <div className="p-6 sm:p-8">
+            <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
 
-      {/* Profile Header */}
+              {/* Avatar */}
+              <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full bg-gray-900 text-2xl font-bold uppercase text-white">
+                {profile.name?.charAt(0) || "?"}
+              </div>
 
-      <section className="rounded-2xl bg-white p-8 shadow-xl">
+              {/* Information */}
+              <div className="min-w-0">
+                <h1 className="text-2xl font-bold tracking-tight text-gray-950 sm:text-3xl">
+                  {profile.name}
+                </h1>
 
-        <div className="flex flex-col items-center gap-6 sm:flex-row">
+                {profile.college && (
+                  <p className="mt-1 text-sm text-gray-500">
+                    {profile.college}
+                  </p>
+                )}
 
-          <div className="flex h-24 w-24 items-center justify-center rounded-full bg-blue-100">
-            <User
-              size={48}
-              className="text-blue-600"
-            />
+                {(profile.department ||
+                  profile.year) && (
+                  <p className="mt-1 text-sm text-gray-500">
+                    {[
+                      profile.department,
+                      profile.year
+                        ? `Year ${profile.year}`
+                        : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" • ")}
+                  </p>
+                )}
+              </div>
+
+            </div>
           </div>
+        </section>
 
+        {/* Listing Summary */}
+        <div className="mt-8 flex items-center justify-between">
           <div>
-            <h1 className="text-4xl font-bold text-gray-900">
-              {provider.name ?? "Student Provider"}
-            </h1>
+            <h2 className="text-2xl font-bold text-gray-950">
+              Listings
+            </h2>
 
-            <p className="mt-2 text-gray-500">
-              Campus service provider
-            </p>
-
-            <p className="mt-2 text-sm text-gray-500">
-              {services?.length ?? 0} service
-              {(services?.length ?? 0) === 1
-                ? ""
-                : "s"} listed
+            <p className="mt-1 text-sm text-gray-500">
+              {totalListings}{" "}
+              {totalListings === 1
+                ? "listing"
+                : "listings"}
             </p>
           </div>
-
         </div>
 
-      </section>
+        {/* Empty State */}
+        {totalListings === 0 && (
+          <div className="mt-5 rounded-2xl border border-dashed border-gray-300 bg-white px-6 py-20 text-center">
+            <Package
+              size={42}
+              className="mx-auto text-gray-400"
+            />
 
-      {/* Services */}
+            <h3 className="mt-4 text-lg font-semibold text-gray-900">
+              No listings yet
+            </h3>
 
-      <section className="mt-12">
+            <p className="mt-2 text-sm text-gray-500">
+              {profile.name} hasn't created any
+              listings yet.
+            </p>
+          </div>
+        )}
 
-        <h2 className="text-3xl font-bold">
-          Services by {provider.name ?? "this provider"}
-        </h2>
+        {/* Products */}
+        {productListings.length > 0 && (
+          <section className="mt-8">
+            <div className="mb-4 flex items-center gap-2">
+              <Package
+                size={20}
+                className="text-gray-700"
+              />
 
-        {services && services.length > 0 ? (
-          <div className="mt-8 grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
+              <h2 className="text-xl font-bold text-gray-950">
+                Products
+              </h2>
+            </div>
 
-            {services.map((service) => (
-              <Link
-                key={service.id}
-                href={`/services/${service.id}`}
-                className={`overflow-hidden rounded-2xl border bg-white shadow transition hover:-translate-y-1 hover:shadow-xl ${
-                  service.status === "Completed"
-                    ? "opacity-75"
-                    : ""
-                }`}
-              >
-
-                {/* Image */}
-
-                <div className="relative h-52 w-full bg-gray-100">
-
-                  {service.image_url ? (
-                    <Image
-                      src={service.image_url}
-                      alt={service.title}
-                      fill
-                      className="object-cover"
-                    />
+            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              {productListings.map((product) => (
+                <Link
+                  key={product.id}
+                  href={`/products/${product.id}`}
+                  className="group overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                >
+                  {product.image_url ? (
+                    <div className="relative h-52 w-full bg-gray-100">
+                      <Image
+                        src={product.image_url}
+                        alt={product.name}
+                        fill
+                        className="object-cover transition duration-300 group-hover:scale-[1.02]"
+                      />
+                    </div>
                   ) : (
-                    <div className="flex h-full w-full items-center justify-center">
-                      <Wrench
-                        size={60}
+                    <div className="flex h-52 items-center justify-center bg-gray-100">
+                      <Package
+                        size={40}
                         className="text-gray-400"
                       />
                     </div>
                   )}
 
-                </div>
+                  <div className="p-5">
+                    {product.category && (
+                      <span className="rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs font-medium text-gray-600">
+                        {product.category}
+                      </span>
+                    )}
 
-                {/* Content */}
+                    <h3 className="mt-3 line-clamp-2 text-lg font-semibold text-gray-950">
+                      {product.name}
+                    </h3>
 
-                <div className="p-6">
-
-                  <div className="flex items-center justify-between gap-3">
-
-                    <span className="rounded-full bg-blue-100 px-3 py-1 text-sm font-medium text-blue-700">
-                      {service.category}
-                    </span>
-
-                    <span
-                      className={`flex items-center gap-1 rounded-full px-3 py-1 text-sm font-medium ${
-                        service.status === "Available"
-                          ? "bg-green-100 text-green-700"
-                          : service.status === "Reserved"
-                          ? "bg-yellow-100 text-yellow-700"
-                          : "bg-red-100 text-red-700"
-                      }`}
-                    >
-                      {service.status === "Available" && (
-                        <CheckCircle size={14} />
-                      )}
-
-                      {service.status === "Reserved" && (
-                        <Clock3 size={14} />
-                      )}
-
-                      {service.status === "Completed" && (
-                        <XCircle size={14} />
-                      )}
-
-                      {service.status}
-                    </span>
-
-                  </div>
-
-                  <h3 className="mt-4 text-2xl font-bold text-gray-900">
-                    {service.title}
-                  </h3>
-
-                  <p className="mt-3 line-clamp-3 text-gray-600">
-                    {service.description}
-                  </p>
-
-                  <p className="mt-5 text-xl font-bold text-blue-600">
-                    {service.pricing_type === "Free"
-                      ? "Free"
-                      : service.price
-                      ? `₹${service.price} • ${service.pricing_type}`
-                      : "Contact"}
-                  </p>
-
-                  {service.location && (
-                    <p className="mt-2 flex items-center gap-2 text-sm text-gray-500">
-                      <MapPin size={15} />
-                      {service.location}
+                    <p className="mt-3 text-lg font-bold text-gray-950">
+                      ₹{product.price}
                     </p>
-                  )}
-
-                  <div className="mt-6 rounded-lg bg-blue-600 py-3 text-center font-semibold text-white">
-                    View Service
                   </div>
-
-                </div>
-
-              </Link>
-            ))}
-
-          </div>
-        ) : (
-          <div className="mt-8 rounded-2xl border border-dashed py-20 text-center">
-
-            <Wrench
-              size={60}
-              className="mx-auto text-gray-400"
-            />
-
-            <h3 className="mt-5 text-2xl font-bold">
-              No Services Listed
-            </h3>
-
-            <p className="mt-2 text-gray-500">
-              This provider hasn't listed any services yet.
-            </p>
-
-          </div>
+                </Link>
+              ))}
+            </div>
+          </section>
         )}
 
-      </section>
+        {/* Services */}
+        {serviceListings.length > 0 && (
+          <section className="mt-10">
+            <div className="mb-4 flex items-center gap-2">
+              <Wrench
+                size={20}
+                className="text-gray-700"
+              />
 
+              <h2 className="text-xl font-bold text-gray-950">
+                Services
+              </h2>
+            </div>
+
+            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              {serviceListings.map((service) => (
+                <Link
+                  key={service.id}
+                  href={`/services/${service.id}`}
+                  className="group overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                >
+                  {service.image_url ? (
+                    <div className="relative h-52 w-full bg-gray-100">
+                      <Image
+                        src={service.image_url}
+                        alt={service.title}
+                        fill
+                        className="object-cover transition duration-300 group-hover:scale-[1.02]"
+                      />
+                    </div>
+                  ) : (
+                    <div className="flex h-52 items-center justify-center bg-gray-100">
+                      <Wrench
+                        size={40}
+                        className="text-gray-400"
+                      />
+                    </div>
+                  )}
+
+                  <div className="p-5">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs font-medium text-gray-600">
+                        {service.category ||
+                          "Service"}
+                      </span>
+
+                      {service.status && (
+                        <span
+                          className={`text-xs font-medium ${
+                            service.status ===
+                            "Available"
+                              ? "text-green-600"
+                              : service.status ===
+                                  "Reserved"
+                                ? "text-yellow-600"
+                                : "text-red-600"
+                          }`}
+                        >
+                          {service.status}
+                        </span>
+                      )}
+                    </div>
+
+                    <h3 className="mt-4 line-clamp-2 text-lg font-semibold text-gray-950">
+                      {service.title}
+                    </h3>
+
+                    {service.description && (
+                      <p className="mt-2 line-clamp-2 text-sm leading-6 text-gray-500">
+                        {service.description}
+                      </p>
+                    )}
+
+                    <div className="mt-4 flex items-center justify-between border-t border-gray-100 pt-4">
+                      <p className="text-sm font-semibold text-gray-900">
+                        {service.pricing_type ===
+                        "Free"
+                          ? "Free"
+                          : service.price
+                            ? `₹${service.price}`
+                            : "Contact"}
+                      </p>
+
+                      {service.location && (
+                        <div className="flex min-w-0 items-center gap-1 text-xs text-gray-500">
+                          <MapPin
+                            size={14}
+                            className="shrink-0"
+                          />
+
+                          <span className="truncate">
+                            {service.location}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* Roommates */}
+        {roommateListings.length > 0 && (
+          <section className="mt-10">
+            <div className="mb-4 flex items-center gap-2">
+              <Home
+                size={20}
+                className="text-gray-700"
+              />
+
+              <h2 className="text-xl font-bold text-gray-950">
+                Roommate Listings
+              </h2>
+            </div>
+
+            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              {roommateListings.map((roommate) => (
+                <Link
+                  key={roommate.id}
+                  href={`/roommates/${roommate.id}`}
+                  className="group overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                >
+                  {roommate.image_url ? (
+                    <div className="relative h-52 w-full bg-gray-100">
+                      <Image
+                        src={roommate.image_url}
+                        alt={roommate.name}
+                        fill
+                        className="object-cover transition duration-300 group-hover:scale-[1.02]"
+                      />
+                    </div>
+                  ) : (
+                    <div className="flex h-52 items-center justify-center bg-gray-100">
+                      <Home
+                        size={40}
+                        className="text-gray-400"
+                      />
+                    </div>
+                  )}
+
+                  <div className="p-5">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs font-medium text-gray-600">
+                        {roommate.room_type ||
+                          "Roommate"}
+                      </span>
+
+                      {roommate.status && (
+                        <span
+                          className={`text-xs font-medium ${
+                            roommate.status ===
+                            "available"
+                              ? "text-green-600"
+                              : roommate.status ===
+                                  "filled"
+                                ? "text-red-600"
+                                : "text-yellow-600"
+                          }`}
+                        >
+                          {roommate.status}
+                        </span>
+                      )}
+                    </div>
+
+                    <h3 className="mt-4 text-lg font-semibold text-gray-950">
+                      {roommate.name}
+                    </h3>
+
+                    {roommate.location && (
+                      <div className="mt-3 flex items-center gap-1.5 text-sm text-gray-500">
+                        <MapPin size={15} />
+                        {roommate.location}
+                      </div>
+                    )}
+
+                    <div className="mt-4 border-t border-gray-100 pt-4">
+                      <p className="text-lg font-bold text-gray-950">
+                        ₹{roommate.budget}
+                        <span className="ml-1 text-xs font-normal text-gray-500">
+                          / month
+                        </span>
+                      </p>
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </section>
+        )}
+
+      </div>
     </main>
   );
 }

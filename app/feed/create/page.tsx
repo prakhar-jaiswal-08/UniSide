@@ -30,10 +30,25 @@ export default function CreateFeedPostPage() {
       return;
     }
 
-    if (selectedFile.type.startsWith("image/")) {
+    const fileName = selectedFile.name.toLowerCase();
+
+    const isHeic =
+      fileName.endsWith(".heic") ||
+      fileName.endsWith(".heif");
+
+    const isImage =
+      selectedFile.type.startsWith("image/") ||
+      isHeic;
+
+    const isVideo =
+      selectedFile.type.startsWith("video/");
+
+    if (isImage) {
       if (selectedFile.size > MAX_IMAGE_SIZE) {
         toast.error("Image must be 10 MB or smaller.");
         e.target.value = "";
+        setFile(null);
+        setMediaType("none");
         return;
       }
 
@@ -42,10 +57,12 @@ export default function CreateFeedPostPage() {
       return;
     }
 
-    if (selectedFile.type.startsWith("video/")) {
+    if (isVideo) {
       if (selectedFile.size > MAX_VIDEO_SIZE) {
         toast.error("Video must be 50 MB or smaller.");
         e.target.value = "";
+        setFile(null);
+        setMediaType("none");
         return;
       }
 
@@ -101,10 +118,9 @@ export default function CreateFeedPostPage() {
         toast.error("Failed to create post.");
         return;
       }
+toast.success("Post created.");
 
-      toast.success("Post created.");
-      router.push("/feed");
-      router.refresh();
+window.location.href = "/feed";
     } catch (error) {
       console.error("Create feed post error:", error);
 
@@ -182,7 +198,7 @@ export default function CreateFeedPostPage() {
 
                 <input
                   type="file"
-                  accept="image/*,video/*"
+                  accept="image/*,.heic,.heif,video/*"
                   onChange={handleFileChange}
                   className="hidden"
                 />

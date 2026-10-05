@@ -1,9 +1,6 @@
 "use client";
 
-import {
-  prepareImageFile,
-  uploadImage,
-} from "@/lib/uploadImage";
+import { uploadProductImage } from "@/lib/uploadProductImage";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
@@ -16,7 +13,6 @@ export default function SellPage() {
   const [category, setCategory] = useState("Others");
   const [images, setImages] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
-  const [processingImages, setProcessingImages] = useState(false);
 
   const router = useRouter();
 
@@ -34,7 +30,7 @@ export default function SellPage() {
     checkUser();
   }, [router]);
 
-  const handleImageChange = async (
+  const handleImageChange = (
     e: React.ChangeEvent<HTMLInputElement>
   ) => {
     if (!e.target.files) return;
@@ -46,50 +42,32 @@ export default function SellPage() {
       return;
     }
 
-    setProcessingImages(true);
+    setImages((current) => {
+      const combined = [...current, ...selectedFiles];
 
-    try {
-      const preparedFiles: File[] = [];
+      const unique = combined.filter(
+        (file, index, array) =>
+          index ===
+          array.findIndex(
+            (item) =>
+              item.name === file.name &&
+              item.size === file.size &&
+              item.lastModified === file.lastModified
+          )
+      );
 
-      for (const file of selectedFiles) {
-        const preparedFile = await prepareImageFile(file);
-        preparedFiles.push(preparedFile);
-      }
-
-      setImages((current) => {
-        const combined = [...current, ...preparedFiles];
-
-        const unique = combined.filter(
-          (file, index, array) =>
-            index ===
-            array.findIndex(
-              (item) =>
-                item.name === file.name &&
-                item.size === file.size &&
-                item.lastModified === file.lastModified
-            )
+      if (unique.length > 5) {
+        toast.error(
+          "You can upload a maximum of 5 photos."
         );
 
-        if (unique.length > 5) {
-          toast.error(
-            "You can upload a maximum of 5 photos."
-          );
+        return unique.slice(0, 5);
+      }
 
-          return unique.slice(0, 5);
-        }
+      return unique;
+    });
 
-        return unique;
-      });
-    } catch (err) {
-      toast.error(
-        err instanceof Error
-          ? err.message
-          : "Unable to process the selected image."
-      );
-    } finally {
-      setProcessingImages(false);
-      e.target.value = "";
-    }
+    e.target.value = "";
   };
 
   const removeImage = (index: number) => {
@@ -98,7 +76,9 @@ export default function SellPage() {
     );
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (
+    e: React.FormEvent
+  ) => {
     e.preventDefault();
 
     if (images.length === 0) {
@@ -112,6 +92,7 @@ export default function SellPage() {
 
     if (!user) {
       toast.error("Please login first.");
+      router.push("/login");
       return;
     }
 
@@ -121,11 +102,18 @@ export default function SellPage() {
       const imageUrls: string[] = [];
 
       for (const image of images) {
-        const url = await uploadImage(image);
+        const url = await uploadProductImage(
+          image,
+          user.id
+        );
+
         imageUrls.push(url);
       }
 
-      const { data: product, error } = await supabase
+      const {
+        data: product,
+        error,
+      } = await supabase
         .from("products")
         .insert([
           {
@@ -142,7 +130,8 @@ export default function SellPage() {
 
       if (error || !product) {
         throw new Error(
-          error?.message || "Failed to create product."
+          error?.message ||
+            "Failed to create product."
         );
       }
 
@@ -155,7 +144,9 @@ export default function SellPage() {
             display_order: index + 1,
           }));
 
-        const { error: imagesError } = await supabase
+        const {
+          error: imagesError,
+        } = await supabase
           .from("product_images")
           .insert(additionalImages);
 
@@ -164,7 +155,9 @@ export default function SellPage() {
         }
       }
 
-      toast.success("Product listed successfully!");
+      toast.success(
+        "Product listed successfully!"
+      );
 
       setName("");
       setPrice("");
@@ -174,6 +167,11 @@ export default function SellPage() {
 
       router.push("/products");
     } catch (err) {
+      console.error(
+        "Product creation error:",
+        err
+      );
+
       toast.error(
         err instanceof Error
           ? err.message
@@ -221,7 +219,9 @@ export default function SellPage() {
                 type="text"
                 placeholder="e.g. iPhone 13"
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                onChange={(e) =>
+                  setName(e.target.value)
+                }
                 required
                 className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900 outline-none placeholder:text-gray-400 transition focus:border-gray-500 focus:ring-2 focus:ring-gray-200"
               />
@@ -241,7 +241,9 @@ export default function SellPage() {
                 min="0"
                 placeholder="Enter price"
                 value={price}
-                onChange={(e) => setPrice(e.target.value)}
+                onChange={(e) =>
+                  setPrice(e.target.value)
+                }
                 required
                 className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900 outline-none placeholder:text-gray-400 transition focus:border-gray-500 focus:ring-2 focus:ring-gray-200"
               />
@@ -258,7 +260,9 @@ export default function SellPage() {
               <select
                 id="category"
                 value={category}
-                onChange={(e) => setCategory(e.target.value)}
+                onChange={(e) =>
+                  setCategory(e.target.value)
+                }
                 className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900 outline-none transition focus:border-gray-500 focus:ring-2 focus:ring-gray-200"
               >
                 <option>Electronics</option>
@@ -283,7 +287,9 @@ export default function SellPage() {
                 rows={5}
                 placeholder="Describe your product..."
                 value={description}
-                onChange={(e) => setDescription(e.target.value)}
+                onChange={(e) =>
+                  setDescription(e.target.value)
+                }
                 required
                 className="w-full resize-y rounded-lg border border-gray-300 bg-white px-3 py-3 text-sm text-gray-900 outline-none placeholder:text-gray-400 transition focus:border-gray-500 focus:ring-2 focus:ring-gray-200"
               />
@@ -303,14 +309,12 @@ export default function SellPage() {
                 accept="image/*,.heic,.heif"
                 multiple
                 onChange={handleImageChange}
-                disabled={processingImages || uploading}
+                disabled={uploading}
                 className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-700 file:mr-4 file:rounded-md file:border-0 file:bg-gray-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-gray-700 hover:file:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-60"
               />
 
               <p className="mt-2 text-xs text-gray-500">
-                {processingImages
-                  ? "Processing selected images..."
-                  : "Select up to 5 photos. HEIC and HEIF images are supported."}
+                Select up to 5 photos. HEIC and HEIF images are supported.
               </p>
 
               {images.length > 0 && (
@@ -328,8 +332,10 @@ export default function SellPage() {
 
                       <button
                         type="button"
-                        onClick={() => removeImage(index)}
-                        disabled={processingImages || uploading}
+                        onClick={() =>
+                          removeImage(index)
+                        }
+                        disabled={uploading}
                         className="absolute right-1.5 top-1.5 rounded-md bg-gray-900 px-2 py-1 text-xs font-medium text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         Remove
@@ -349,16 +355,12 @@ export default function SellPage() {
             <div className="pt-2">
               <button
                 type="submit"
-                disabled={
-                  uploading || processingImages
-                }
+                disabled={uploading}
                 className="w-full rounded-lg bg-gray-900 py-3 text-sm font-semibold text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {processingImages
-                  ? "Processing Images..."
-                  : uploading
-                    ? "Uploading..."
-                    : "List Product"}
+                {uploading
+                  ? "Uploading..."
+                  : "List Product"}
               </button>
             </div>
 

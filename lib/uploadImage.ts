@@ -14,17 +14,21 @@ export async function prepareImageFile(file: File): Promise<File> {
   }
 
   try {
-    const heic2any = (await import("heic2any")).default;
+    const formData = new FormData();
+    formData.append("file", file);
 
-    const converted = await heic2any({
-      blob: file,
-      toType: "image/jpeg",
-      quality: 0.8,
+    const response = await fetch("/api/convert-heic", {
+      method: "POST",
+      body: formData,
     });
 
-    const jpegBlob = Array.isArray(converted)
-      ? converted[0]
-      : converted;
+    if (!response.ok) {
+      throw new Error(
+        "This HEIC image could not be processed. Please try saving it as JPG and upload again."
+      );
+    }
+
+    const jpegBlob = await response.blob();
 
     return new File(
       [jpegBlob],
@@ -38,7 +42,7 @@ export async function prepareImageFile(file: File): Promise<File> {
     console.error("HEIC conversion failed:", error);
 
     throw new Error(
-      "This HEIC image could not be processed on this device. Please try saving it as JPG and upload again."
+      "This HEIC image could not be processed. Please try saving it as JPG and upload again."
     );
   }
 }
@@ -65,9 +69,7 @@ export async function uploadImage(
   if (uploadError) {
     console.error("Image upload failed:", uploadError);
 
-    throw new Error(
-      "Image upload failed. Please try again."
-    );
+    throw new Error("Image upload failed. Please try again.");
   }
 
   const { data } = supabase.storage

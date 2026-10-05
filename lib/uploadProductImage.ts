@@ -1,11 +1,11 @@
 import { supabase } from "@/lib/supabase";
 
-export async function uploadFeedMedia(
+export async function uploadProductImage(
   file: File,
   userId: string
 ) {
   if (!file) {
-    throw new Error("No file selected.");
+    throw new Error("No image selected.");
   }
 
   if (!userId) {
@@ -20,28 +20,26 @@ export async function uploadFeedMedia(
     throw new Error("No active Supabase session.");
   }
 
-  const resourceType = file.type.startsWith("video/")
-    ? "video"
-    : "image";
-
-  const { data, error } = await supabase.functions.invoke(
-    "cloudinary-signature",
-    {
-      body: {
-        resourceType,
-      },
-      headers: {
-        Authorization: `Bearer ${session.access_token}`,
-      },
-    }
-  );
+  const { data, error } =
+    await supabase.functions.invoke(
+      "cloudinary-signature",
+      {
+        body: {
+          resourceType: "image",
+        },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      }
+    );
 
   if (error) {
     let details = error.message;
 
     if (error.context) {
       try {
-        const responseBody = await error.context.json();
+        const responseBody =
+          await error.context.json();
 
         details =
           responseBody?.error ||
@@ -79,8 +77,14 @@ export async function uploadFeedMedia(
     "timestamp",
     String(data.timestamp)
   );
-  formData.append("signature", data.signature);
-  formData.append("public_id", data.publicId);
+  formData.append(
+    "signature",
+    data.signature
+  );
+  formData.append(
+    "public_id",
+    data.publicId
+  );
 
   const response = await fetch(
     `https://api.cloudinary.com/v1_1/${data.cloudName}/${data.resourceType}/upload`,
@@ -95,37 +99,13 @@ export async function uploadFeedMedia(
   if (!response.ok || !result.secure_url) {
     throw new Error(
       result?.error?.message ||
-        "Failed to upload media to Cloudinary."
+        "Failed to upload image to Cloudinary."
     );
   }
 
-  if (data.resourceType === "image") {
+  // Convert HEIC/HEIF and other images to browser-friendly JPG delivery.
   return result.secure_url.replace(
     "/image/upload/",
     "/image/upload/f_jpg/"
   );
-}
-
-if (data.resourceType === "image") {
-  return result.secure_url.replace(
-    "/image/upload/",
-    "/image/upload/f_jpg/"
-  );
-}
-
-if (data.resourceType === "image") {
-  return result.secure_url.replace(
-    "/image/upload/",
-    "/image/upload/f_jpg/"
-  );
-}
-
-if (data.resourceType === "image") {
-  return result.secure_url.replace(
-    "/image/upload/",
-    "/image/upload/f_jpg/"
-  );
-}
-
-return result.secure_url as string;
 }

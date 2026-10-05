@@ -11,10 +11,7 @@ import {
   X,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import {
-  prepareImageFile,
-  uploadImage,
-} from "@/lib/uploadImage";
+import { uploadRoommateImage } from "@/lib/uploadRoommateImage";
 
 export default function CreateRoommatePage() {
   const router = useRouter();
@@ -34,8 +31,6 @@ export default function CreateRoommatePage() {
 
   const [images, setImages] = useState<File[]>([]);
   const [loading, setLoading] = useState(false);
-  const [processingImages, setProcessingImages] =
-    useState(false);
   const [error, setError] = useState("");
 
   function handleChange(
@@ -49,7 +44,7 @@ export default function CreateRoommatePage() {
     });
   }
 
-  async function handleImageChange(
+  function handleImageChange(
     e: React.ChangeEvent<HTMLInputElement>
   ) {
     if (!e.target.files) return;
@@ -61,31 +56,25 @@ export default function CreateRoommatePage() {
       return;
     }
 
-    setProcessingImages(true);
     setError("");
 
     try {
-      const preparedFiles: File[] = [];
+      const validFiles: File[] = [];
 
       for (const file of selectedFiles) {
-        if (
-          file.size > 5 * 1024 * 1024
-        ) {
+        if (file.size > 5 * 1024 * 1024) {
           throw new Error(
             `${file.name} is larger than 5 MB.`
           );
         }
 
-        const preparedFile =
-          await prepareImageFile(file);
-
-        preparedFiles.push(preparedFile);
+        validFiles.push(file);
       }
 
       setImages((current) => {
         const combined = [
           ...current,
-          ...preparedFiles,
+          ...validFiles,
         ];
 
         const unique = combined.filter(
@@ -117,7 +106,6 @@ export default function CreateRoommatePage() {
           : "Unable to process the selected image."
       );
     } finally {
-      setProcessingImages(false);
       e.target.value = "";
     }
   }
@@ -147,9 +135,7 @@ export default function CreateRoommatePage() {
       }
 
       if (!form.name.trim()) {
-        throw new Error(
-          "Please enter your name."
-        );
+        throw new Error("Please enter your name.");
       }
 
       if (!form.college.trim()) {
@@ -185,31 +171,33 @@ export default function CreateRoommatePage() {
         );
       }
 
-      // Create the roommate listing first.
-      const { data: roommate, error: insertError } =
-        await supabase
-          .from("roommates")
-          .insert({
-            user_id: user.id,
-            name: form.name.trim(),
-            college: form.college.trim(),
-            location: form.location.trim(),
-            budget: Number(form.budget),
-            room_type: form.room_type,
-            gender_preference:
-              form.gender_preference || null,
-            preferences:
-              form.preferences.trim() || null,
-            move_in_date:
-              form.move_in_date || null,
-            description:
-              form.description.trim() || null,
-            contact_preference:
-              form.contact_preference || null,
-            status: "available",
-          })
-          .select("id")
-          .single();
+      // Create roommate listing first.
+      const {
+        data: roommate,
+        error: insertError,
+      } = await supabase
+        .from("roommates")
+        .insert({
+          user_id: user.id,
+          name: form.name.trim(),
+          college: form.college.trim(),
+          location: form.location.trim(),
+          budget: Number(form.budget),
+          room_type: form.room_type,
+          gender_preference:
+            form.gender_preference || null,
+          preferences:
+            form.preferences.trim() || null,
+          move_in_date:
+            form.move_in_date || null,
+          description:
+            form.description.trim() || null,
+          contact_preference:
+            form.contact_preference || null,
+          status: "available",
+        })
+        .select("id")
+        .single();
 
       if (insertError || !roommate) {
         throw new Error(
@@ -218,28 +206,29 @@ export default function CreateRoommatePage() {
         );
       }
 
-      // Upload selected images.
+      // Upload selected images to Cloudinary.
       if (images.length > 0) {
         const imageUrls: string[] = [];
 
         for (const image of images) {
-          const url = await uploadImage(
+          const url = await uploadRoommateImage(
             image,
-            "roommate-images"
+            user.id
           );
 
           imageUrls.push(url);
         }
 
         // First image becomes the main image.
-        const { error: imageUpdateError } =
-          await supabase
-            .from("roommates")
-            .update({
-              image_url: imageUrls[0],
-            })
-            .eq("id", roommate.id)
-            .eq("user_id", user.id);
+        const {
+          error: imageUpdateError,
+        } = await supabase
+          .from("roommates")
+          .update({
+            image_url: imageUrls[0],
+          })
+          .eq("id", roommate.id)
+          .eq("user_id", user.id);
 
         if (imageUpdateError) {
           throw new Error(
@@ -249,13 +238,14 @@ export default function CreateRoommatePage() {
 
         // Remaining images go into roommate_images.
         if (imageUrls.length > 1) {
-          const additionalImages = imageUrls
-            .slice(1)
-            .map((imageUrl, index) => ({
-              roommate_id: roommate.id,
-              image_url: imageUrl,
-              display_order: index + 1,
-            }));
+          const additionalImages =
+            imageUrls
+              .slice(1)
+              .map((imageUrl, index) => ({
+                roommate_id: roommate.id,
+                image_url: imageUrl,
+                display_order: index + 1,
+              }));
 
           const {
             error: additionalImagesError,
@@ -331,6 +321,7 @@ export default function CreateRoommatePage() {
             </div>
 
             <div className="grid gap-5 sm:grid-cols-2">
+
               <div>
                 <label
                   htmlFor="name"
@@ -421,6 +412,7 @@ export default function CreateRoommatePage() {
             </div>
 
             <div className="grid gap-5 sm:grid-cols-2">
+
               <div>
                 <label
                   htmlFor="room_type"
@@ -560,15 +552,13 @@ export default function CreateRoommatePage() {
               />
 
               <span className="text-sm font-medium">
-                {processingImages
-                  ? "Processing images..."
-                  : images.length > 0
-                    ? `${images.length} photo${
-                        images.length > 1
-                          ? "s"
-                          : ""
-                      } selected`
-                    : "Choose listing photos"}
+                {images.length > 0
+                  ? `${images.length} photo${
+                      images.length > 1
+                        ? "s"
+                        : ""
+                    } selected`
+                  : "Choose listing photos"}
               </span>
 
               <span className="mt-1 text-xs text-muted-foreground">
@@ -581,10 +571,7 @@ export default function CreateRoommatePage() {
                 type="file"
                 accept="image/*,.heic,.heif"
                 multiple
-                disabled={
-                  processingImages ||
-                  loading
-                }
+                disabled={loading}
                 onChange={handleImageChange}
                 className="hidden"
               />
@@ -618,10 +605,7 @@ export default function CreateRoommatePage() {
                       onClick={() =>
                         removeImage(index)
                       }
-                      disabled={
-                        processingImages ||
-                        loading
-                      }
+                      disabled={loading}
                       aria-label={`Remove photo ${
                         index + 1
                       }`}
@@ -642,6 +626,7 @@ export default function CreateRoommatePage() {
             </h2>
 
             <div className="space-y-5">
+
               <div>
                 <label
                   htmlFor="preferences"
@@ -700,16 +685,12 @@ export default function CreateRoommatePage() {
 
             <button
               type="submit"
-              disabled={
-                loading || processingImages
-              }
+              disabled={loading}
               className="rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {processingImages
-                ? "Processing Images..."
-                : loading
-                  ? "Creating..."
-                  : "Create Listing"}
+              {loading
+                ? "Creating..."
+                : "Create Listing"}
             </button>
           </div>
         </form>

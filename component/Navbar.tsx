@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Search, User } from "lucide-react";
+import { Search, User, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import SidePanel from "./SidePanel";
 
@@ -13,6 +13,7 @@ export default function Navbar() {
   const [search, setSearch] = useState("");
   const [searching, setSearching] = useState(false);
   const [sidePanelOpen, setSidePanelOpen] = useState(false);
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
 
   const router = useRouter();
 
@@ -44,11 +45,7 @@ export default function Navbar() {
     router.push("/");
   }
 
-  async function handleSearch(
-    e: React.KeyboardEvent<HTMLInputElement>
-  ) {
-    if (e.key !== "Enter") return;
-
+  async function performSearch() {
     const query = search.trim();
 
     if (!query || searching) return;
@@ -89,10 +86,12 @@ export default function Navbar() {
       }
 
       const hasProducts =
-        !productError && (products?.length ?? 0) > 0;
+        !productError &&
+        (products?.length ?? 0) > 0;
 
       const hasServices =
-        !serviceError && (services?.length ?? 0) > 0;
+        !serviceError &&
+        (services?.length ?? 0) > 0;
 
       if (hasProducts && !hasServices) {
         router.push(
@@ -119,6 +118,16 @@ export default function Navbar() {
       );
     } finally {
       setSearching(false);
+      setMobileSearchOpen(false);
+    }
+  }
+
+  function handleSearchKeyDown(
+    e: React.KeyboardEvent<HTMLInputElement>
+  ) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      performSearch();
     }
   }
 
@@ -129,20 +138,20 @@ export default function Navbar() {
 
           {/* Logo */}
           <Link
-  href="/"
-  className="flex h-14 w-[190px] shrink-0 items-center overflow-hidden"
->
-  <Image
-    src="/uniside-logo.png"
-    alt="Uniside"
-    width={190}
-    height={190}
-    priority
-    className="h-[190px] w-[190px] max-w-none object-cover object-center"
-  />
-</Link>
+            href="/"
+            className="flex h-14 w-[190px] shrink-0 items-center overflow-hidden"
+          >
+            <Image
+              src="/uniside-logo.png"
+              alt="Uniside"
+              width={190}
+              height={190}
+              priority
+              className="h-[190px] w-[190px] max-w-none object-cover object-center"
+            />
+          </Link>
 
-          {/* Search */}
+          {/* Desktop Search */}
           <div className="mx-6 hidden max-w-xl flex-1 lg:block">
             <div className="flex h-11 items-center rounded-full border border-gray-300 bg-white px-4 transition focus-within:border-gray-500 focus-within:ring-2 focus-within:ring-gray-200">
               <Search
@@ -157,7 +166,7 @@ export default function Navbar() {
                 onChange={(e) =>
                   setSearch(e.target.value)
                 }
-                onKeyDown={handleSearch}
+                onKeyDown={handleSearchKeyDown}
                 disabled={searching}
                 className="w-full bg-transparent text-sm text-gray-900 outline-none placeholder:text-gray-500"
               />
@@ -200,7 +209,9 @@ export default function Navbar() {
             {isLoggedIn ? (
               <button
                 type="button"
-                onClick={() => setSidePanelOpen(true)}
+                onClick={() =>
+                  setSidePanelOpen(true)
+                }
                 aria-label="Open account menu"
                 className="ml-1 flex h-10 w-10 items-center justify-center rounded-full bg-white text-gray-950 transition hover:bg-gray-200"
               >
@@ -220,16 +231,31 @@ export default function Navbar() {
           <div className="flex items-center gap-2 xl:hidden">
             <button
               type="button"
-              aria-label="Search"
+              onClick={() =>
+                setMobileSearchOpen(
+                  !mobileSearchOpen
+                )
+              }
+              aria-label={
+                mobileSearchOpen
+                  ? "Close search"
+                  : "Open search"
+              }
               className="flex h-10 w-10 items-center justify-center rounded-full border border-gray-300 bg-white text-gray-700"
             >
-              <Search size={19} />
+              {mobileSearchOpen ? (
+                <X size={19} />
+              ) : (
+                <Search size={19} />
+              )}
             </button>
 
             {isLoggedIn ? (
               <button
                 type="button"
-                onClick={() => setSidePanelOpen(true)}
+                onClick={() =>
+                  setSidePanelOpen(true)
+                }
                 aria-label="Open account menu"
                 className="flex h-10 w-10 items-center justify-center rounded-full border border-gray-300 bg-white text-gray-700"
               >
@@ -245,6 +271,45 @@ export default function Navbar() {
             )}
           </div>
         </div>
+
+        {/* Mobile Search */}
+        {mobileSearchOpen && (
+          <div className="border-t border-gray-200 px-4 py-3 xl:hidden">
+            <div className="flex h-11 items-center rounded-full border border-gray-300 bg-white px-3 focus-within:border-gray-500 focus-within:ring-2 focus-within:ring-gray-200">
+              <Search
+                size={18}
+                className="mr-2 shrink-0 text-gray-500"
+              />
+
+              <input
+                type="text"
+                autoFocus
+                placeholder="Search products, services, roommates..."
+                value={search}
+                onChange={(e) =>
+                  setSearch(e.target.value)
+                }
+                onKeyDown={handleSearchKeyDown}
+                disabled={searching}
+                className="min-w-0 flex-1 bg-transparent text-sm text-gray-900 outline-none placeholder:text-gray-500"
+              />
+
+              <button
+                type="button"
+                onClick={performSearch}
+                disabled={
+                  searching ||
+                  !search.trim()
+                }
+                className="ml-2 shrink-0 rounded-full bg-gray-950 px-4 py-2 text-xs font-medium text-white disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {searching
+                  ? "Searching..."
+                  : "Search"}
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Mobile Navigation */}
         <div className="flex gap-1 overflow-x-auto border-t border-gray-200 px-4 py-2 xl:hidden">
@@ -278,7 +343,9 @@ export default function Navbar() {
       {isLoggedIn && (
         <SidePanel
           open={sidePanelOpen}
-          onClose={() => setSidePanelOpen(false)}
+          onClose={() =>
+            setSidePanelOpen(false)
+          }
           onLogout={handleLogout}
         />
       )}

@@ -268,10 +268,10 @@ export default async function ProductPage({
 
                       {seller ? (
                         <Link
-                          href={`/profile/user/${product.user_id}`}
-                          className="mt-0.5 block truncate text-sm font-semibold text-gray-950 hover:underline"
+                          href={`/profile/${product.user_id}`}
+                          className="mt-0.5 block text-sm font-semibold text-gray-900 hover:underline"
                         >
-                          {seller.name}
+                          {seller.name?.trim() || "Unknown seller"}
                         </Link>
                       ) : (
                         <p className="mt-0.5 text-sm font-medium text-gray-600">
