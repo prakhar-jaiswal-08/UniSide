@@ -1,3 +1,6 @@
+"use client";
+
+import { usePathname } from "next/navigation";
 import ChatSidebar from "@/component/chat/ChatSidebar";
 
 export default function ChatLayout({
@@ -5,16 +8,32 @@ export default function ChatLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return (
-    <main className="flex h-[calc(100vh-73px)] bg-[#111b21] overflow-hidden">
+  const pathname = usePathname();
 
+  const isConversation = pathname.startsWith("/chat/");
+
+  return (
+    <main className="flex h-[calc(100vh-73px)] overflow-hidden bg-[#111b21]">
+      
+      {/* Chat Sidebar */}
       <aside
-        className="hidden md:block w-[380px] flex-none border-r border-zinc-800"
+        className={`w-full flex-none border-r border-zinc-800 ${
+          isConversation
+            ? "hidden md:block md:w-[380px]"
+            : "block md:w-[380px]"
+        }`}
       >
         <ChatSidebar />
       </aside>
 
-      <div className="flex-1 min-w-0 h-full">
+      {/* Chat Content */}
+      <div
+        className={`min-w-0 flex-1 ${
+          isConversation
+            ? "block"
+            : "hidden md:block"
+        }`}
+      >
         {children}
       </div>
 
