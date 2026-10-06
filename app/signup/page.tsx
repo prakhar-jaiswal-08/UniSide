@@ -16,6 +16,8 @@ import {
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 
+const ALLOWED_COLLEGE_DOMAINS = ["ggits.net"];
+
 export default function SignupPage() {
   const router = useRouter();
 
@@ -34,7 +36,7 @@ export default function SignupPage() {
     e.preventDefault();
 
     const trimmedName = name.trim();
-    const trimmedEmail = email.trim();
+    const trimmedEmail = email.trim().toLowerCase();
     const trimmedCollege = college.trim();
     const trimmedDepartment = department.trim();
     const trimmedMobile = mobileNumber.trim();
@@ -45,7 +47,24 @@ export default function SignupPage() {
     }
 
     if (!trimmedEmail) {
-      toast.error("Please enter your email.");
+      toast.error("Please enter your college email.");
+      return;
+    }
+
+    // Check college email domain
+    const emailParts = trimmedEmail.split("@");
+    const emailDomain =
+      emailParts.length === 2
+        ? emailParts[1].toLowerCase()
+        : "";
+
+    if (
+      emailParts.length !== 2 ||
+      !ALLOWED_COLLEGE_DOMAINS.includes(emailDomain)
+    ) {
+      toast.error(
+        "Please use your college email ID (@ggits.net)."
+      );
       return;
     }
 
@@ -82,20 +101,25 @@ export default function SignupPage() {
     setLoading(true);
 
     try {
-      const { data, error } = await supabase.auth.signUp({
-        email: trimmedEmail,
-        password,
-        options: {
-          data: {
-            name: trimmedName,
-            age: Number(age),
-            college: trimmedCollege,
-            department: trimmedDepartment,
-            year,
-            mobile_number: trimmedMobile,
-          },
-        },
-      });
+     const siteUrl =
+  process.env.NEXT_PUBLIC_SITE_URL ||
+  window.location.origin;
+
+const { data, error } = await supabase.auth.signUp({
+  email: trimmedEmail,
+  password,
+  options: {
+    emailRedirectTo: `${siteUrl}/login`,
+    data: {
+      name: trimmedName,
+      age: Number(age),
+      college: trimmedCollege,
+      department: trimmedDepartment,
+      year,
+      mobile_number: trimmedMobile,
+    },
+  },
+});
 
       if (error) {
         toast.error(error.message);
@@ -103,13 +127,12 @@ export default function SignupPage() {
       }
 
       /*
-       * With Supabase email confirmation enabled,
-       * signup succeeds but there is normally no session
-       * until the user verifies their email.
+       * When Supabase email confirmation is enabled,
+       * signup succeeds without creating an active session.
        */
       if (!data.session) {
         toast.success(
-          "Account created. Please check your email to verify your account."
+          "Account created. Please check your college email to verify your account."
         );
 
         router.push("/login");
@@ -117,9 +140,7 @@ export default function SignupPage() {
       }
 
       /*
-       * This branch is kept as a fallback in case email
-       * confirmation is disabled or the Supabase configuration
-       * changes in the future.
+       * Fallback in case email confirmation is disabled.
        */
       toast.success("Account created successfully!");
       router.push("/");
@@ -152,7 +173,6 @@ export default function SignupPage() {
 
         {/* Form Card */}
         <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm sm:p-8">
-
           <form onSubmit={handleSignup}>
 
             {/* Personal Information */}
@@ -200,13 +220,13 @@ export default function SignupPage() {
                 </div>
               </div>
 
-              {/* Email */}
+              {/* College Email */}
               <div className="mt-5">
                 <label
                   htmlFor="email"
                   className="mb-2 block text-sm font-medium text-gray-800"
                 >
-                  Email
+                  College Email
                 </label>
 
                 <div className="relative">
@@ -220,10 +240,18 @@ export default function SignupPage() {
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="Enter your email"
+                    placeholder="yourname@ggits.net"
                     className="h-11 w-full rounded-lg border border-gray-300 bg-white pl-10 pr-4 text-sm text-gray-900 outline-none transition placeholder:text-gray-400 focus:border-gray-500 focus:ring-2 focus:ring-gray-200"
                   />
                 </div>
+
+                <p className="mt-2 text-xs text-gray-500">
+                  Use your college email ID ending in{" "}
+                  <span className="font-medium text-gray-700">
+                    @ggits.net
+                  </span>
+                  . A verification link will be sent to this email.
+                </p>
               </div>
 
               {/* Password */}
