@@ -105,7 +105,7 @@ export default function SignupPage() {
         email: trimmedEmail,
         password,
         options: {
-          emailRedirectTo: "https://uniside.in/login",
+          emailRedirectTo: "https://uniside.in/auth/callback",
           data: {
             name: trimmedName,
             age: Number(age),
