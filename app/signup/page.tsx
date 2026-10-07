@@ -101,25 +101,21 @@ export default function SignupPage() {
     setLoading(true);
 
     try {
-     const siteUrl =
-  process.env.NEXT_PUBLIC_SITE_URL ||
-  window.location.origin;
-
-const { data, error } = await supabase.auth.signUp({
-  email: trimmedEmail,
-  password,
-  options: {
-    emailRedirectTo: `${siteUrl}/login`,
-    data: {
-      name: trimmedName,
-      age: Number(age),
-      college: trimmedCollege,
-      department: trimmedDepartment,
-      year,
-      mobile_number: trimmedMobile,
-    },
-  },
-});
+      const { data, error } = await supabase.auth.signUp({
+        email: trimmedEmail,
+        password,
+        options: {
+          emailRedirectTo: "https://uniside.in/login",
+          data: {
+            name: trimmedName,
+            age: Number(age),
+            college: trimmedCollege,
+            department: trimmedDepartment,
+            year,
+            mobile_number: trimmedMobile,
+          },
+        },
+      });
 
       if (error) {
         toast.error(error.message);
